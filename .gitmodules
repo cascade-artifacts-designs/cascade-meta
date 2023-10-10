@@ -1,6 +1,6 @@
 [submodule "tools/cascade-yosys"]
 	path = tools/cascade-yosys
-	url = https://github.com/cascade-artifacts-designs/cascade-yosyst
+	url = https://github.com/cascade-artifacts-designs/cascade-yosys
 [submodule "tools/riscv-gnu-toolchain"]
 	path = tools/riscv-gnu-toolchain
 	url = https://github.com/riscv-collab/riscv-gnu-toolchain
