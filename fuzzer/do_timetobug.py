@@ -4,17 +4,13 @@
 
 # This script evaluates the duration to detect each bug.
 
-# sys.argv[1]: design name
-# sys.argv[2]: num of cores allocated to fuzzing
-# sys.argv[3]: offset for seed (to avoid running the fuzzing on the same instances over again)
-# sys.argv[4]: authorize privileges (by default 1)
-
 from top.fuzzdesigntiming import measure_time_to_bug, plot_bug_timings
 from cascade.toleratebugs import tolerate_bug_for_bug_timing
 
 from params.runparams import PATH_TO_TMP
 import json
 import os
+import sys
 
 bug_designs = {
     'p1': 'picorv32',
@@ -58,26 +54,72 @@ bug_designs = {
     'r1': 'rocket',
     'y1': 'cva6-y1',
 }
+
+def gen_path_to_json(bug_name, num_workers, num_reps, max_num_instructions, nodependencybias, timeout_seconds):
+    filebasename = f"bug_timings_{bug_name}_{num_workers}_{num_reps}"
+    if max_num_instructions is not None:
+        filebasename += f"_maxinstr{max_num_instructions}"
+    else:
+        filebasename += f"_nomaxinstr"
+
+    if nodependencybias:
+        filebasename += f"_nodepbias"
+    else:
+        filebasename += f"_depbias"
+    filebasename += f"_timeout{timeout_seconds}"
+    return os.path.join(PATH_TO_TMP, f"{filebasename}.json")
+
 if __name__ == '__main__':
     if "CASCADE_ENV_SOURCED" not in os.environ:
         raise Exception("The Cascade environment must be sourced prior to running the Python recipes.")
 
-    NUM_WORKERS = 64
-    NUM_REPS = 1
+    num_workers = int(sys.argv[1])
+    num_reps = int(sys.argv[2])
+    timeout_seconds = int(sys.argv[3])
+
+    # Pairs (maxnuminstrs, nodependencybias)
+    scenarios = [
+        (1, False),
+        (10, False),
+        # (10, True),
+        (100, False),
+        # (100, True),
+        (1000, False),
+        # (1000, True),
+        (10000, False),
+        # (10000, True),
+        # (100000, False),
+        # (100000, True),
+    ]
 
     # Measure the time to detect each bug.
-
     for bug_name, design_name in bug_designs.items():
         tolerate_bug_for_bug_timing(design_name, bug_name, True)
-        ret = measure_time_to_bug(design_name, NUM_WORKERS, NUM_REPS)
+        for scenario in scenarios:
+            max_num_instructions, nodependencybias = scenario
+            ret = measure_time_to_bug(design_name, num_workers, num_reps, max_num_instructions, nodependencybias, timeout_seconds)
+            retpath = gen_path_to_json(bug_name, num_workers, num_reps, max_num_instructions, nodependencybias, timeout_seconds)
+            json.dump(ret, open(retpath, "w"))
+            print('Saved bug timing results to', retpath)
         tolerate_bug_for_bug_timing(design_name, bug_name, False)
 
-        retpath = os.path.join(PATH_TO_TMP, f"bug_timings_{bug_name}_{NUM_WORKERS}_{NUM_REPS}.json")
-        json.dump(ret, open(retpath, "w"))
-        print('Saved bug timing results to', retpath)
+    # Regroup the JSONs for convenience
+    from collections import defaultdict
+    all_rets = {}
+    for bug_name, _ in bug_designs.items():
+        all_rets[bug_name] = defaultdict(dict)
+        for scenario in scenarios:
+            max_num_instructions, nodependencybias = scenario
+            retpath = gen_path_to_json(bug_name, num_workers, num_reps, max_num_instructions, nodependencybias, timeout_seconds)
+            all_rets[bug_name][max_num_instructions][nodependencybias] = json.load(open(retpath, "r"))
+    # Write a single json out of them
+    aggregated_json_path = os.path.join(PATH_TO_TMP, f"bug_timings_all.json")
+    json.dump(all_rets, open(aggregated_json_path, "w"))
+    print('Saved aggregated timing results to', aggregated_json_path)
 
     # Plot these measurements.
-    plot_bug_timings(NUM_WORKERS, NUM_REPS)
+    # plot_bug_timings(num_workers, num_reps)
+    # plot_bug_timings_scenarios(num_workers, num_reps)
 
 else:
     raise Exception("This module must be at the toplevel.")
