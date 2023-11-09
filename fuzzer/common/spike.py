@@ -252,7 +252,7 @@ def _get_spike_ns_per_instr() -> int:
     return __spike_ns_per_instr
 
 def get_spike_timeout_seconds() -> int:
-    return max((SPIKE_TIMEOUT_SLACK_FACTOR*_get_spike_ns_per_instr())/1e9, 1)
+    return max((SPIKE_TIMEOUT_SLACK_FACTOR*_get_spike_ns_per_instr())/1e9, 10)
 
 # @brief Runs a spike instance and returns the average nanoseconds per instruction.
 @cache
