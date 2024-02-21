@@ -688,7 +688,7 @@ def reduce_program(memsize: int, design_name: str, randseed: int, nmax_bbs: int,
     # If no fail at all
     if failing_bb_id == len(fuzzerstate.instr_objs_seq) and not is_mismatch(fuzzerstate, failing_bb_id-1):
         if not quiet:
-            print(f"Success (no failure at all with tuple: ({memsize}, design_name, {randseed}, {nmax_bbs})")
+            print(f"Success (no failure at all with tuple: ({memsize}, {design_name}, {randseed}, {nmax_bbs}, {authorize_privileges}))")
         return True, time.time() - start_time, numinstrs
 
     ###
