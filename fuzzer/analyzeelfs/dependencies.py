@@ -9,7 +9,7 @@ import re
 # - some CSR (write is not explicit in the assembly)
 
 INTREG_ABINAMES = [
-    'zero', 'ra', 'sp', 'gp', 'tp', 't0', 't1', 't2', 's0', 's1', 'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 't3', 't4', 't5', 't6'
+    'zero', 'ra', 'sp', 'gp', 'tp', 't0', 't1', 't2', 'fp', 's1', 'a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10', 's11', 't3', 't4', 't5', 't6'
 ]
 
 FPREG_ABINAMES = [
@@ -20,6 +20,8 @@ FPREG_ABINAMES = [
 def regname_to_reg_id(regname: str):
     if regname in INTREG_ABINAMES:
         return (INTREG_ABINAMES.index(regname), False)
+    elif regname == 's0':
+        return (8, False)
     elif regname in FPREG_ABINAMES:
         return (FPREG_ABINAMES.index(regname), True)
     else:
