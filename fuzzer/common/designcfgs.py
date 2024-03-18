@@ -88,7 +88,7 @@ def design_has_float_support(design_name) -> bool:
 
 @cache
 def design_has_double_support(design_name) -> bool:
-    return 'f' in get_design_march_flags(design_name) or 'g' in get_design_march_flags(design_name)
+    return 'd' in get_design_march_flags(design_name) or 'g' in get_design_march_flags(design_name)
 
 @cache
 def design_has_muldiv_support(design_name) -> bool:
