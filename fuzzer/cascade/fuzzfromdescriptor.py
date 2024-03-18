@@ -94,5 +94,5 @@ def fuzz_single_from_descriptor(memsize: int, design_name: str, randseed: int, n
             else:
                 loggers[random.randrange(len(loggers))].log(False, {'memsize': memsize, 'design_name': design_name, 'randseed': randseed, 'nmax_bbs': nmax_bbs, 'authorize_privileges': authorize_privileges}, False, emsg)
         else:
-            print(f"Failed test_run_rtl_single for params memsize: `{memsize}`, design_name: `{design_name}`, check_pc_spike_again: `{check_pc_spike_again}`, randseed: `{randseed}`, nmax_bbs: `{nmax_bbs}`, authorize_privileges: `{authorize_privileges}` -- ({memsize}, design_name, {randseed}, {nmax_bbs}, {authorize_privileges})\n{e}")
+            print(f"Failed test_run_rtl_single for params memsize: `{memsize}`, design_name: `{design_name}`, check_pc_spike_again: `{check_pc_spike_again}`, randseed: `{randseed}`, nmax_bbs: `{nmax_bbs}`, authorize_privileges: `{authorize_privileges}` -- ({memsize}, {design_name}, {randseed}, {nmax_bbs}, {authorize_privileges})\n{e}")
         return 0, 0, 0, 0
