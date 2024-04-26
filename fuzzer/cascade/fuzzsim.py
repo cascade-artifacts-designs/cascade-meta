@@ -186,17 +186,34 @@ def runtest_simulator(fuzzerstate, elfpath: str, expected_regvals: tuple, overri
     # Compare the expected vs. received registers
     reg_mismatch = False
     ret_str_list_regmismatch = []
+    # Debug int regs
+    debug_info = []
+    debug_regs = ["zero","ra","sp","gp","tp","t0","t1","t2",\
+                    "s0","s1","a0","a1","a2","a3","a4","a5",\
+                    "a6","a7","s2","s3","s4","s5","s6","s7",\
+                    "t3","t4","t5","t6"]
+
     for reg_id in range(fuzzerstate.num_pickable_regs-1):
         if expected_intregvals[reg_id] != received_intregvals[reg_id] and fuzzerstate.intregpickstate.get_regstate(reg_id+1) in (IntRegIndivState.FREE, IntRegIndivState.CONSUMED):
             reg_mismatch = True
             ret_str_list_regmismatch.append(f"Register mismatch (x{reg_id+1}) for params: memsize: `{fuzzerstate.memsize}`, design_name: `{fuzzerstate.design_name}`, randseed: `{fuzzerstate.randseed}`, nmax_bbs: `{fuzzerstate.nmax_bbs}`, authorize_privileges: `{fuzzerstate.authorize_privileges}`. State: {fuzzerstate.intregpickstate.get_regstate(reg_id+1)}. Expected `{hex(expected_intregvals[reg_id])}`, got `{hex(received_intregvals[reg_id])}`.")
+        # To debug
+        temp_reg_id = reg_id
 
+    for i in range(temp_reg_id+1):
+        debug_info.append(f"debug ({debug_regs[i+1]}):\t Expected `{hex(expected_intregvals[i])}`, \t got `{hex(received_intregvals[i])}`;\n")
+
+    #TODO print fregs info
     if fuzzerstate.design_has_fpu:
         for fp_reg_id in range(fuzzerstate.num_pickable_floating_regs):
             # received_floatregvals[fp_reg_id] can be None if the FPU is disabled in the final block and the final permission level does not permit enabling it.
             if expected_floatregvals[fp_reg_id] != received_floatregvals[fp_reg_id] and received_floatregvals[fp_reg_id] is not None:
                 reg_mismatch = True
                 ret_str_list_regmismatch.append(f"Register mismatch (f{fp_reg_id}) for params: memsize: `{fuzzerstate.memsize}`, design_name: `{fuzzerstate.design_name}`, randseed: `{fuzzerstate.randseed}`, nmax_bbs: `{fuzzerstate.nmax_bbs}`, authorize_privileges: `{fuzzerstate.authorize_privileges}`. Expected `{hex(expected_floatregvals[fp_reg_id])}`, got `{hex(received_floatregvals[fp_reg_id])}`.")
+    # print mismatch int regs info
+    if  reg_mismatch:
+        for infos in debug_info:
+            print(infos,end="")
     return not reg_mismatch, '\n  '.join(ret_str_list_regmismatch)
 
 

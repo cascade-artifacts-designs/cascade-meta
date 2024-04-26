@@ -47,6 +47,9 @@ def _create_R12DInstruction(instr_str: str, fuzzerstate, iscompressed: bool):
     if DO_ASSERT:
         assert instr_str in R12DInstructions
     rs1, rs2 = tuple(fuzzerstate.intregpickstate.pick_int_inputregs(2))
+    # Forced to the t6 register, a normally accessible address
+    if 'amo' in instr_str or 'lr' in instr_str or 'sc' in instr_str:
+        rs1 = 0b11111
     rd = fuzzerstate.intregpickstate.pick_int_outputreg()
     return R12DInstruction(instr_str, rd, rs1, rs2, iscompressed)
 

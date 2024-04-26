@@ -20,7 +20,7 @@ from rv.rv64i import *
 from rv.rv64f import *
 from rv.rv64d import *
 from rv.rv64m import *
-
+from rv.rv32a import *
 import random
 
 # These classes are here for generating multi-instruction fuzzing programs.
@@ -78,7 +78,9 @@ class ImmInstruction(CFInstruction):
 ###
 
 # Instructions with rs1, rs2 and rd
-R12DInstructions = ("add", "sub", "sll", "slt", "sltu", "xor", "srl", "sra", "or", "and", "addw", "subw", "sllw", "srlw", "sraw", "mul", "mulh", "mulhsu", "mulhu", "div", "divu", "rem", "remu", "mulw", "divw", "divuw", "remw", "remuw")
+R12DInstructions = ("add", "sub", "sll", "slt", "sltu", "xor", "srl", "sra", "or", "and", "addw", "subw", "sllw", "srlw", "sraw", \
+                    "mul", "mulh", "mulhsu", "mulhu", "div", "divu", "rem", "remu", "mulw", "divw", "divuw", "remw", "remuw", \
+                    "amoswap.w", "amoadd.w", "amoxor.w", "amoand.w", "amoor.w", "amomin.w", "amomax.w", "amominu.w", "amomaxu.w","lr.w","sc.w")
 class R12DInstruction(CFInstruction):
     authorized_instr_strs = R12DInstructions
 
@@ -156,6 +158,29 @@ class R12DInstruction(CFInstruction):
             return rv64m_remw(self.rd, self.rs1, self.rs2)
         elif self.instr_str == "remuw":
             return rv64m_remuw(self.rd, self.rs1, self.rs2)
+        # rv32a
+        elif self.instr_str == "lr.w":
+            return rv32a_lrw(self.rd, self.rs1, self.rs2)
+        elif self.instr_str == "sc.w":
+            return rv32a_scw(self.rd, self.rs1, self.rs2)
+        elif self.instr_str == "amoswap.w":
+            return rv32a_amoswapw(self.rd, self.rs1, self.rs2)
+        elif self.instr_str == "amoadd.w":
+            return rv32a_amoaddw(self.rd, self.rs1, self.rs2)
+        elif self.instr_str == "amoxor.w":
+            return rv32a_amoxorw(self.rd, self.rs1, self.rs2)
+        elif self.instr_str == "amoand.w":
+            return rv32a_amoandw(self.rd, self.rs1, self.rs2)
+        elif self.instr_str == "amoor.w":
+            return rv32a_amoorw(self.rd, self.rs1, self.rs2)
+        elif self.instr_str == "amomin.w":
+            return rv32a_amominw(self.rd, self.rs1, self.rs2)
+        elif self.instr_str == "amomax.w":
+            return rv32a_amomaxw(self.rd, self.rs1, self.rs2)
+        elif self.instr_str == "amominu.w":
+            return rv32a_amominuw(self.rd, self.rs1, self.rs2)
+        elif self.instr_str == "amomaxu.w":
+            return rv32a_amomaxuw(self.rd, self.rs1, self.rs2)
         # Default case
         else:
             raise ValueError(f"Unexpected instruction string: `{self.instr_str}`.")

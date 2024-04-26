@@ -62,14 +62,19 @@ def run_rtl(memsize: int, design_name: str, randseed: int, nmax_bbs: int, author
     time_seconds_spent_in_rtl_sim = time.time() - start
 
     # For debugging, potentially expose the ELF files
-    if NO_REMOVE_TMPFILES:
-        print('rtl elfpath', rtl_elfpath)
-    if not NO_REMOVE_TMPFILES:
-        os.remove(rtl_elfpath)
-        del rtl_elfpath
+    # if NO_REMOVE_TMPFILES:
+    #     print('rtl elfpath', rtl_elfpath)
+    # if not NO_REMOVE_TMPFILES:
+    #     os.remove(rtl_elfpath)
+    #     del rtl_elfpath
 
     if not is_success:
+        print("maybe bug")
+        print('rtl elfpath', rtl_elfpath)
         raise Exception(rtl_msg)
+    else:
+        os.remove(rtl_elfpath)
+        del rtl_elfpath
     return time_seconds_spent_in_gen_bbs, time_seconds_spent_in_spike_resol, time_seconds_spent_in_gen_elf, time_seconds_spent_in_rtl_sim
 
 ###

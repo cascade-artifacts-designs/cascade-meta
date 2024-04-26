@@ -45,6 +45,45 @@ def instruc_rtype(opcode: int, rd: int, funct3: int, rs1: int, rs2: int, funct7:
 # @param rd: uint8_t
 # @param funct3: uint8_t
 # @param rs1: uint8_t
+# @param rs2: uint8_t
+# @param rl: uint8_t
+# @param aq: uint8_t
+# @param funct7: uint8_t
+def instruc_amotype(opcode: int, rd: int, funct3: int, rs1: int, rs2: int, rl: int, aq: int, funct7: int):
+    if DO_ASSERT:
+        assert(opcode >= 0)
+        assert(rd >= 0)
+        assert(funct3 >= 0)
+        assert(rs1 >= 0)
+        assert(rs2 >= 0)
+        assert(funct7 >= 0)
+        assert(rl >= 0)
+        assert(aq >= 0)
+
+    rd_offset     = 7
+    funct3_offset = rd_offset + 5
+    rs1_offset    = funct3_offset + 3
+    rs2_offset    = rs1_offset + 5
+    rl_offset     = rs2_offset + 5
+    aq_offset     = rl_offset + 1
+    funct7_offset = aq_offset + 1
+
+    return opcode | \
+        (rd << rd_offset) | \
+        (funct3 << funct3_offset) | \
+        (rs1 << rs1_offset) | \
+        (rs2 << rs2_offset) | \
+        (rl << rl_offset)   | \
+        (aq << aq_offset)   | \
+        (funct7 << funct7_offset)
+
+
+
+# @return uint32_t
+# @param opcode: uint8_t
+# @param rd: uint8_t
+# @param funct3: uint8_t
+# @param rs1: uint8_t
 def instruc_itype(opcode: int, rd: int, funct3: int, rs1: int, imm: int):
     if DO_ASSERT:
         assert(opcode < (1 << 7))

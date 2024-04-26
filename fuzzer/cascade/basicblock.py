@@ -46,6 +46,9 @@ def gen_basicblock(fuzzerstate):
 
     curr_isa_class = None # This is used in case there is only space for control flow
 
+    # For Amo Synchronize updates ; gzhinsert 
+    fence_need = False
+
     # We stop the instruction generation either when there is no more space available, or when we encounter an end-of-state instruction
     while fuzzerstate.memview.get_available_contig_space(curr_alloc_cursor)-4 > BASIC_BLOCK_MIN_SPACE:
 
@@ -53,6 +56,12 @@ def gen_basicblock(fuzzerstate):
         fuzzerstate.memview.alloc_mem_range(curr_alloc_cursor, curr_alloc_cursor+4)
         curr_alloc_cursor += 4
         curr_addr = fuzzerstate.curr_bb_start_addr + 4*len(fuzzerstate.instr_objs_seq[-1])
+
+        # Synchronize updates
+        if fence_need:
+            fuzzerstate.instr_objs_seq[-1].append(create_instr("fence", fuzzerstate, curr_addr))
+            fence_need = False
+            continue
 
         # Get the next instruction class
         if fuzzerstate.has_reached_max_instr_num():
@@ -168,7 +177,25 @@ def gen_basicblock(fuzzerstate):
             next_instr = gen_epcfill_instr(fuzzerstate)
         elif curr_isa_class == ISAInstrClass.RANDOM_CSR:
             next_instr = gen_random_csr_op(fuzzerstate)
-
+        elif curr_isa_class == ISAInstrClass.AMO or curr_isa_class == ISAInstrClass.AMO64:
+            
+            #TO ensure amo is NOT last instr , for fence instr
+            if fuzzerstate.memview.get_available_contig_space(curr_alloc_cursor)-4 > BASIC_BLOCK_MIN_SPACE:
+                instr_str = gen_next_instrstr_from_isaclass(curr_isa_class, fuzzerstate)
+                next_instr = create_instr(instr_str, fuzzerstate, curr_addr)
+                #TODO 暂时禁用LR指令（原因：DUT在LR指令后不能跟随fence指令）
+                while True:
+                    if 'lr' in instr_str:
+                        #print("next_instr:",instr_str)
+                        instr_str = gen_next_instrstr_from_isaclass(curr_isa_class, fuzzerstate)
+                        next_instr = create_instr(instr_str, fuzzerstate, curr_addr)
+                    else:
+                        break
+            #print("next_instr:",next_instr)
+                fence_need = True
+            else:
+                fuzzerstate.instr_objs_seq[-1].append(create_instr("fence", fuzzerstate, curr_addr))
+                continue
         else:
             instr_str = gen_next_instrstr_from_isaclass(curr_isa_class, fuzzerstate)
             next_instr = create_instr(instr_str, fuzzerstate, curr_addr)
