@@ -183,7 +183,7 @@ def gen_basicblock(fuzzerstate):
             if fuzzerstate.memview.get_available_contig_space(curr_alloc_cursor)-4 > BASIC_BLOCK_MIN_SPACE:
                 instr_str = gen_next_instrstr_from_isaclass(curr_isa_class, fuzzerstate)
                 next_instr = create_instr(instr_str, fuzzerstate, curr_addr)
-                #TODO disable the LR instruction (reason: cannot follow the fence instruction after the LR instruction). 暂时禁用LR指令（原因：DUT在LR指令后不能跟随fence指令）
+                #TODO disable the LR instruction (reason: cannot follow the fence instruction after the LR instruction). 
                 while True:
                     if 'lr' in instr_str:
                         instr_str = gen_next_instrstr_from_isaclass(curr_isa_class, fuzzerstate)
