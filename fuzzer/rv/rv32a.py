@@ -1,4 +1,4 @@
-# Copyright 202 Zihui Guo
+# Copyright 2024 Zihui Guo
 
 import rv.rvprotoinstrs as rvprotoinstrs
 import random
