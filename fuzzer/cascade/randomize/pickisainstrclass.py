@@ -21,7 +21,7 @@ ISAINSTRCLASS_INITIAL_BOOSTERS = {
     ISAInstrClass.ALU64:       0.1,
     ISAInstrClass.MULDIV:      0.1,
     ISAInstrClass.MULDIV64:    0.1,
-    ISAInstrClass.AMO:         0,
+    ISAInstrClass.AMO:         0.2,
     ISAInstrClass.AMO64:       0,
     ISAInstrClass.JAL :        0.1,
     ISAInstrClass.JALR:        0.4,
