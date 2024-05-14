@@ -6,7 +6,7 @@
 
 from params.runparams import DO_ASSERT
 from rv.csrids import CSR_IDS
-from common.designcfgs import is_design_32bit, get_design_stop_sig_addr, get_design_reg_dump_addr, design_has_float_support, get_design_fpreg_dump_addr
+from common.designcfgs import is_design_32bit, get_design_stop_sig_addr, get_design_reg_dump_addr, design_has_float_support, design_has_double_support, get_design_fpreg_dump_addr
 from params.fuzzparams import RDEP_MASK_REGISTER_ID, MAX_NUM_PICKABLE_REGS, MAX_NUM_PICKABLE_FLOATING_REGS, FPU_ENDIS_REGISTER_ID
 from cascade.privilegestate import PrivilegeStateEnum
 from rv.asmutil import li_into_reg
@@ -34,7 +34,7 @@ def finalblock(fuzzerstate, design_name: str):
     ret = []
     is_design_64bit = not is_design_32bit(design_name)
     design_has_fpu = design_has_float_support(design_name)
-    design_has_fpud = design_has_float_support(design_name)
+    design_has_fpudouble = design_has_double_support(design_name)
 
     ###
     # Dump registers
@@ -66,7 +66,7 @@ def finalblock(fuzzerstate, design_name: str):
             fuzzerstate.is_fpu_activated = True
         if fuzzerstate.is_fpu_activated:
             for reg_id in range(MAX_NUM_PICKABLE_FLOATING_REGS):
-                ret.append(FloatStoreInstruction("fsd" if design_has_fpud else "fsw", RDEP_MASK_REGISTER_ID, reg_id, 8, -1, is_design_64bit))
+                ret.append(FloatStoreInstruction("fsd" if design_has_fpudouble else "fsw", RDEP_MASK_REGISTER_ID, reg_id, 8, -1, is_design_64bit))
                 ret.append(SpecialInstruction("fence"))
 
     ###

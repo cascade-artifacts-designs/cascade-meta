@@ -822,7 +822,7 @@ def reduce_program(memsize: int, design_name: str, randseed: int, nmax_bbs: int,
     if failing_instr_id == -1 and fault_from_prev_bb:
         ret = gen_reduced_elf(fuzzerstate, failing_bb_id-1)
         if ret is False:
-            test_fuzzerstate_smaller, rtl_elfpath_smaller, expected_regvals_pairs_smaller, numinstrs_smaller = itertools.repeat(None)
+            test_fuzzerstate_smaller, rtl_elfpath_smaller, expected_regvals_pairs_smaller, numinstrs_smaller = itertools.repeat(None, 4)
             print('Warning: smaller is trivial. Error may come from initial block.')
             return True, time.time() - start_time, numinstrs
         else:
