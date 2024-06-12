@@ -52,9 +52,8 @@ ISAINSTRCLASS_INITIAL_BOOSTERS = {
 # return a ISAInstrClass
 # Do NOT @cache this function, as it is a random function.
 def _gen_next_isainstrclass_from_weights(weights: list = None) -> ISAInstrClass:
-    ret = None
-    while ret is None or weights[ret] == 0:
-        ret = random.choices(list(ISAInstrClass), weights=weights)[0]
+    ret = random.choices(list(weights.keys()), weights=weights.values())[0]
+    assert weights[ret] != 0
     return ret
 
 # @brief For now, the weights used for choosing instructions are fixed over time.

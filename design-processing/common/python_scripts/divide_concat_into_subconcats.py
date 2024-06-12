@@ -54,7 +54,7 @@ def reduce_bracket(match):
     if is_there_remainder:
         ret_groups.append("  {} [{}-1:0] {}_{};".format(TYPE, tot_num_elems % MAX_TERMS_IN_BRACKET, var_name_with_suffix, num_macroterms_floor))
 
-    ret_groups.append("  assign {} = {}_0;".format(var_name, var_name_with_suffix))
+    ret_groups.append("  assign {} = {{ {} }};".format(var_name, ', '.join([f'{var_name_with_suffix}_{i}' for i in range(num_macroterms_floor + 1 if is_there_remainder  else num_macroterms_floor)])))
 
     for macroterm_id in range(num_macroterms_floor):
         macrobracket_content = ' , '.join(splitted[macroterm_id*MAX_TERMS_IN_BRACKET:(macroterm_id+1)*MAX_TERMS_IN_BRACKET])
