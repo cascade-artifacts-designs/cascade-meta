@@ -185,19 +185,62 @@ def runtest_simulator(fuzzerstate, elfpath: str, expected_regvals: tuple, overri
 
     # Compare the expected vs. received registers
     reg_mismatch = False
+    freg_mismatch = False
     ret_str_list_regmismatch = []
+
+    # Debug int regs
+    debug_regs_info = []
+    debug_regs = ["zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", \
+                    "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5", \
+                    "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7", \
+                    "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6"]
+
     for reg_id in range(fuzzerstate.num_pickable_regs-1):
         if expected_intregvals[reg_id] != received_intregvals[reg_id] and fuzzerstate.intregpickstate.get_regstate(reg_id+1) in (IntRegIndivState.FREE, IntRegIndivState.CONSUMED):
             reg_mismatch = True
             ret_str_list_regmismatch.append(f"Register mismatch (x{reg_id+1}) for params: memsize: `{fuzzerstate.memsize}`, design_name: `{fuzzerstate.design_name}`, randseed: `{fuzzerstate.randseed}`, nmax_bbs: `{fuzzerstate.nmax_bbs}`, authorize_privileges: `{fuzzerstate.authorize_privileges}`. State: {fuzzerstate.intregpickstate.get_regstate(reg_id+1)}. Expected `{hex(expected_intregvals[reg_id])}`, got `{hex(received_intregvals[reg_id])}`.")
+        
+        # Debug
+        debug_regs_info.append(
+                f"Debug ({debug_regs[reg_id+1]:<2}):\t Expected: {hex(expected_intregvals[reg_id]):<20}  Got: {hex(received_intregvals[reg_id]):<20}\n".replace(
+                f"{hex(received_intregvals[reg_id]):<20}", 
+                f"\033[91m{hex(received_intregvals[reg_id]):<20}\033[0m" if expected_intregvals[reg_id] != received_intregvals[reg_id] else f"{hex(received_intregvals[reg_id]):<20}")
+            )
+
+    # Debug fregs
+    debug_fregs_info = []
+    debug_fregs = ["ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7", \
+                   "fs0", "fs1", "fa0", "fa1", "fa2", "fa3", "fa4", "fa5", \
+                   "fa6", "fa7", "fs2", "fs3", "fs4", "fs5", "fs6", "fs7", \
+                   "fs8", "fs9", "fs10", "fs11", "ft8", "ft9", "ft10", "ft11"]
 
     if fuzzerstate.design_has_fpu:
         for fp_reg_id in range(fuzzerstate.num_pickable_floating_regs):
             # received_floatregvals[fp_reg_id] can be None if the FPU is disabled in the final block and the final permission level does not permit enabling it.
             if expected_floatregvals[fp_reg_id] != received_floatregvals[fp_reg_id] and received_floatregvals[fp_reg_id] is not None:
-                reg_mismatch = True
+                freg_mismatch = True
                 ret_str_list_regmismatch.append(f"Register mismatch (f{fp_reg_id}) for params: memsize: `{fuzzerstate.memsize}`, design_name: `{fuzzerstate.design_name}`, randseed: `{fuzzerstate.randseed}`, nmax_bbs: `{fuzzerstate.nmax_bbs}`, authorize_privileges: `{fuzzerstate.authorize_privileges}`. Expected `{hex(expected_floatregvals[fp_reg_id])}`, got `{hex(received_floatregvals[fp_reg_id])}`.")
-    return not reg_mismatch, '\n  '.join(ret_str_list_regmismatch)
+        
+            # Debug
+            if received_floatregvals[fp_reg_id] is not None:
+                debug_fregs_info.append(
+                        f"Debug ({debug_fregs[fp_reg_id]:<2}):\t Expected: {hex(expected_floatregvals[fp_reg_id]):<20}  Got: {hex(received_floatregvals[fp_reg_id]):<20}\n".replace(
+                        f"{hex(received_floatregvals[fp_reg_id]):<20}", 
+                        f"\033[91m{hex(received_floatregvals[fp_reg_id]):<20}\033[0m" if expected_floatregvals[fp_reg_id] != received_floatregvals[fp_reg_id] else f"{hex(received_floatregvals[fp_reg_id]):<20}")
+                    )
+    # print mismatch int regs info
+    if  reg_mismatch:
+        for infos in debug_regs_info:
+            print(infos, end="")
+    # print mismatch float regs info
+    if  freg_mismatch:
+        for infos in debug_fregs_info:
+            print(infos, end="")
+
+    del debug_regs_info
+    del debug_fregs_info
+
+    return not (reg_mismatch or freg_mismatch), '\n  '.join(ret_str_list_regmismatch)
 
 
 # Runs the test in the goal of collecting coverage.
