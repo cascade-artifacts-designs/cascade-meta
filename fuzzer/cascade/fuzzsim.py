@@ -221,8 +221,8 @@ def runtest_simulator(fuzzerstate, elfpath: str, expected_regvals: tuple, overri
                 freg_mismatch = True
                 ret_str_list_regmismatch.append(f"Register mismatch (f{fp_reg_id}) for params: memsize: `{fuzzerstate.memsize}`, design_name: `{fuzzerstate.design_name}`, randseed: `{fuzzerstate.randseed}`, nmax_bbs: `{fuzzerstate.nmax_bbs}`, authorize_privileges: `{fuzzerstate.authorize_privileges}`. Expected `{hex(expected_floatregvals[fp_reg_id])}`, got `{hex(received_floatregvals[fp_reg_id])}`.")
         
-        # Debug
-        if received_floatregvals[fp_reg_id] is not None:
+            # Debug
+            if received_floatregvals[fp_reg_id] is not None:
                 debug_fregs_info.append(
                         f"Debug ({debug_fregs[fp_reg_id]:<2}):\t Expected: {hex(expected_floatregvals[fp_reg_id]):<20}  Got: {hex(received_floatregvals[fp_reg_id]):<20}\n".replace(
                         f"{hex(received_floatregvals[fp_reg_id]):<20}", 
