@@ -25,8 +25,7 @@ def is_single_ref(modulename):
 
 if __name__ == "__main__":
     global verilog_content
-    if len(sys.argv) < 3:
-        print("Takes at least 2 arguments: the Verilog source file path, the Verilog target file path. The rest of the arguments are modules that must not be removed")
+    assert len(sys.argv) < 3, f"Takes at least 2 arguments: the Verilog source file path, the Verilog target file path. The rest of the arguments are modules that must not be removed. Got {len(sys.argv)-1} arguments."
 
     with open(sys.argv[1], "r") as f:
         verilog_content = f.read()
