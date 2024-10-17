@@ -142,18 +142,18 @@ class IntRegPickState:
             if self.exists_reg_in_state(IntRegIndivState.CONSUMED):
                 return # self.pick_int_reg_in_state(IntRegIndivState.CONSUMED)
             if self.exists_reg_in_state(IntRegIndivState.PRODUCED1):
-                fuzzerstate.instr_objs_seq[-1] += create_targeted_consumer_instrobj(fuzzerstate)
+                fuzzerstate.add_instruction(create_targeted_consumer_instrobj(fuzzerstate))
                 return # self.pick_int_reg_in_state(IntRegIndivState.CONSUMED)
             if self.exists_reg_in_state(IntRegIndivState.PRODUCED0):
-                fuzzerstate.instr_objs_seq[-1] += create_targeted_producer1_instrobj(fuzzerstate)
+                fuzzerstate.add_instruction(create_targeted_producer1_instrobj(fuzzerstate))
                 # Consumer also includes preconsumer
-                fuzzerstate.instr_objs_seq[-1] += create_targeted_consumer_instrobj(fuzzerstate)
+                fuzzerstate.add_instruction(create_targeted_consumer_instrobj(fuzzerstate))
                 return # self.pick_int_reg_in_state(IntRegIndivState.CONSUMED)
             if self.exists_reg_in_state(IntRegIndivState.FREE):
-                fuzzerstate.instr_objs_seq[-1] += create_targeted_producer0_instrobj(fuzzerstate)
-                fuzzerstate.instr_objs_seq[-1] += create_targeted_producer1_instrobj(fuzzerstate)
+                fuzzerstate.add_instruction(create_targeted_producer0_instrobj(fuzzerstate))
+                fuzzerstate.add_instruction(create_targeted_producer1_instrobj(fuzzerstate))
                 # Consumer also includes preconsumer
-                fuzzerstate.instr_objs_seq[-1] += create_targeted_consumer_instrobj(fuzzerstate)
+                fuzzerstate.add_instruction(create_targeted_consumer_instrobj(fuzzerstate))
                 return # self.pick_int_reg_in_state(IntRegIndivState.CONSUMED)
             raise ValueError('Unexpected state.')
 

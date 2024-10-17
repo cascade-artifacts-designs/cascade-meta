@@ -57,7 +57,8 @@ class MemoryView:
 
     # @param start:    first address of the range.
     # @param end:      last address of the range, excluded.
-    def alloc_mem_range(self, start: int, end: int):
+    def alloc_mem_range(self, start: int, alloc_range: int):
+        end = start + alloc_range
         if DO_ASSERT:
             assert end > start, f"Expected start ({start}) > end ({end}) in alloc_mem_range."
         self.occupied_addrs += end-start

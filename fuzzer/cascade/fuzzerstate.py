@@ -97,6 +97,28 @@ class FuzzerState:
         # Coordinates of the FPU enable/disable instructions. Only used in program reduction.
         self.fpuendis_coords = []
 
+    def add_instruction(self, new_instrobjs):
+        if isinstance(new_instrobjs, list):
+            self.instr_objs_seq[-1].extend(new_instrobjs)
+        else:
+            self.instr_objs_seq[-1].append(new_instrobjs)            
+    
+    def add_fpu_coord(self):
+        bb_id = len(self.instr_objs_seq) - 1
+        instr_id = len(self.instr_objs_seq[-1])
+        self.fpuendis_coords.append((bb_id, instr_id))
+
+    def restore_previous_state(self):
+        self.instr_objs_seq.pop()
+        self.bb_start_addr_seq.pop()
+        self.intregpickstate.restore_state(self.saved_reg_states[-1])
+
+    def get_current_addr(self):
+        return self.curr_bb_start_addr + 4*len(self.instr_objs_seq[-1])
+    
+    def save_reg_state(self):
+        self.saved_reg_states.append(self.intregpickstate.save_curr_state())
+
     def init_new_bb(self):
         self.instr_objs_seq.append([])
 

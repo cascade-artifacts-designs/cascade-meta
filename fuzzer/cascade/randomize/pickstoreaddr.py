@@ -25,7 +25,7 @@ class MemStoreState:
             next_store_location = memview.gen_random_free_addr(ALIGNMENT_BITS_MAX, 1 << ALIGNMENT_BITS_MAX, 0, memview.memsize)
             if next_store_location is None:
                 raise ValueError(f"Could not find a next store location. You may want to increase the memory size (for the moment: {memview.memsize:,} B)")
-            memview.alloc_mem_range(next_store_location, next_store_location + (1 << ALIGNMENT_BITS_MAX))
+            memview.alloc_mem_range(next_store_location, (1 << ALIGNMENT_BITS_MAX))
             self.store_locations.append(next_store_location)
             if DO_ASSERT:
                 assert next_store_location >= 0

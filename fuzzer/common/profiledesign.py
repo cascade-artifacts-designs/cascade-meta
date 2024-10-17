@@ -51,24 +51,24 @@ def __gen_medeleg_profiling_snippet(design_name: str):
     ###
 
     # Write full ones into the medeleg register
-    fuzzerstate.instr_objs_seq[-1].append(RegImmInstruction("addi", 1, 0, -1, is_design_64bit))
-    fuzzerstate.instr_objs_seq[-1].append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.MEDELEG))
+    fuzzerstate.add_instruction(RegImmInstruction("addi", 1, 0, -1, is_design_64bit))
+    fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.MEDELEG))
     # Read medeleg into register 1.
-    fuzzerstate.instr_objs_seq[-1].append(CSRImmInstruction("csrrwi", 1, 0, CSR_IDS.MEDELEG))
+    fuzzerstate.add_instruction(CSRImmInstruction("csrrwi", 1, 0, CSR_IDS.MEDELEG))
 
     # Dump the register
     lui_imm, addi_imm = li_into_reg(regdump_addr)
-    fuzzerstate.instr_objs_seq[-1].append(ImmRdInstruction("lui", RDEP_MASK_REGISTER_ID, lui_imm, is_design_64bit))
-    fuzzerstate.instr_objs_seq[-1].append(RegImmInstruction("addi", RDEP_MASK_REGISTER_ID, RDEP_MASK_REGISTER_ID, addi_imm, is_design_64bit))
-    fuzzerstate.instr_objs_seq[-1].append(IntStoreInstruction("sd" if is_design_64bit else "sw", RDEP_MASK_REGISTER_ID, 1, 0, -1, is_design_64bit))
-    fuzzerstate.instr_objs_seq[-1].append(SpecialInstruction("fence"))
+    fuzzerstate.add_instruction(ImmRdInstruction("lui", RDEP_MASK_REGISTER_ID, lui_imm, is_design_64bit))
+    fuzzerstate.add_instruction(RegImmInstruction("addi", RDEP_MASK_REGISTER_ID, RDEP_MASK_REGISTER_ID, addi_imm, is_design_64bit))
+    fuzzerstate.add_instruction(IntStoreInstruction("sd" if is_design_64bit else "sw", RDEP_MASK_REGISTER_ID, 1, 0, -1, is_design_64bit))
+    fuzzerstate.add_instruction(SpecialInstruction("fence"))
 
     # Quit the simulation
     lui_imm, addi_imm = li_into_reg(stopsig_addr)
-    fuzzerstate.instr_objs_seq[-1].append(ImmRdInstruction("lui", RDEP_MASK_REGISTER_ID, lui_imm, is_design_64bit))
-    fuzzerstate.instr_objs_seq[-1].append(RegImmInstruction("addi", RDEP_MASK_REGISTER_ID, RDEP_MASK_REGISTER_ID, addi_imm, is_design_64bit))
-    fuzzerstate.instr_objs_seq[-1].append(IntStoreInstruction("sd" if is_design_64bit else "sw", RDEP_MASK_REGISTER_ID, 1, 0, -1, is_design_64bit))
-    fuzzerstate.instr_objs_seq[-1].append(SpecialInstruction("fence"))
+    fuzzerstate.add_instruction(ImmRdInstruction("lui", RDEP_MASK_REGISTER_ID, lui_imm, is_design_64bit))
+    fuzzerstate.add_instruction(RegImmInstruction("addi", RDEP_MASK_REGISTER_ID, RDEP_MASK_REGISTER_ID, addi_imm, is_design_64bit))
+    fuzzerstate.add_instruction(IntStoreInstruction("sd" if is_design_64bit else "sw", RDEP_MASK_REGISTER_ID, 1, 0, -1, is_design_64bit))
+    fuzzerstate.add_instruction(SpecialInstruction("fence"))
 
     return fuzzerstate
 
