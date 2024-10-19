@@ -97,28 +97,37 @@ class FuzzerState:
         # Coordinates of the FPU enable/disable instructions. Only used in program reduction.
         self.fpuendis_coords = []
 
+    # @brief adds instruction(s) to the latest basic block 
+    # @param new_instrobjs: List of instructions or single instruction to 
+    # be added to the latest basic block
     def add_instruction(self, new_instrobjs):
         if isinstance(new_instrobjs, list):
             self.instr_objs_seq[-1].extend(new_instrobjs)
         else:
             self.instr_objs_seq[-1].append(new_instrobjs)            
     
+    # @brief registers the coordinates of a FPU enable/disable instruction
     def add_fpu_coord(self):
         bb_id = len(self.instr_objs_seq) - 1
         instr_id = len(self.instr_objs_seq[-1])
         self.fpuendis_coords.append((bb_id, instr_id))
 
+    # @brief removes the current basic block for the generated program and
+    # restores registers to their states in the previous basic block
     def restore_previous_state(self):
         self.instr_objs_seq.pop()
         self.bb_start_addr_seq.pop()
         self.intregpickstate.restore_state(self.saved_reg_states[-1])
 
+    # @brief returns the current address for the next instruction to generate
     def get_current_addr(self):
         return self.curr_bb_start_addr + 4*len(self.instr_objs_seq[-1])
     
+    # @brief stores the current states of registers
     def save_reg_state(self):
         self.saved_reg_states.append(self.intregpickstate.save_curr_state())
 
+    # @brief initializes a new basic block
     def init_new_bb(self):
         self.instr_objs_seq.append([])
 
@@ -126,6 +135,7 @@ class FuzzerState:
         self.next_bb_addr = None
         self.bb_start_addr_seq.append(self.curr_bb_start_addr)
 
+    # @brief generates random weights to select instructions
     def gen_pick_weights(self):
         self.fpuweight = random.random() # Can decrease the overall FPU load to favor other types of instructions
         self.isapickweights = {
@@ -203,14 +213,18 @@ class FuzzerState:
             assert self.proba_reg_starts_with_zero >= 0.0
             assert self.proba_reg_starts_with_zero <= 1.0
 
+    # @brief intializes the design states
     def init_design_state(self):
         if self.design_has_fpu:
             self.is_fpu_activated = True
             self.proba_turn_on_off_fpu_again = random.random()*0.1 # Proba that we re-turn the FPU into the mode it is already in (on or off)
 
+    # @brief return a string identifier of the current program
     def instance_to_str(self):
         return f"{self.memview.memsize}_{self.design_name}_{self.randseed}_{self.nmax_bbs}"
 
+    # @brief returns true if the current program has reached the maximal number 
+    # of instructions
     def has_reached_max_instr_num(self):
         if self.nmax_instructions is None:
             return False
@@ -218,8 +232,9 @@ class FuzzerState:
         # Do not make this check because we still add a JAL after that.
         # assert self.get_num_fuzzing_instructions_sofar() <= self.nmax_instructions, f"self.get_num_fuzzing_instructions_sofar() ({self.get_num_fuzzing_instructions_sofar()}) > self.nmax_instructions ({self.nmax_instructions})"
         return self.get_num_fuzzing_instructions_sofar() >= self.nmax_instructions
-
-    # Does not count the initial and final blocks
+    
+    # @brief counts the number of generated intruction, does not count the 
+    # initial and final blocks
     def get_num_fuzzing_instructions_sofar(self):
         if len(self.instr_objs_seq) <= 1:
             return 0

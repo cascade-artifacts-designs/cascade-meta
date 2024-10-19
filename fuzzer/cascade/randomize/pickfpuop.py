@@ -49,7 +49,7 @@ def gen_fpufsm_instrs(fuzzerstate):
         assert fuzzerstate.design_has_fpu
         assert fuzzerstate.privilegestate.privstate == PrivilegeStateEnum.MACHINE
 
-    ret = None
+    ret = []
     if random.random() < fuzzerstate.proba_turn_on_off_fpu_again:
         rd = 0 # FUTURE WARL
         if fuzzerstate.is_fpu_activated:
