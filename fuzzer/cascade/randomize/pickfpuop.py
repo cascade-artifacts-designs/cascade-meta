@@ -49,24 +49,29 @@ def gen_fpufsm_instrs(fuzzerstate):
         assert fuzzerstate.design_has_fpu
         assert fuzzerstate.privilegestate.privstate == PrivilegeStateEnum.MACHINE
 
+    ret = []
     if random.random() < fuzzerstate.proba_turn_on_off_fpu_again:
         rd = 0 # FUTURE WARL
         if fuzzerstate.is_fpu_activated:
-            return [CSRRegInstruction("csrrs", rd, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
+            ret = [CSRRegInstruction("csrrs", rd, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
         else:
-            return [CSRRegInstruction("csrrc", rd, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
+            ret = [CSRRegInstruction("csrrc", rd, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
 
     # If the FPU is off, then we turn the FPU on.
-    if fuzzerstate.is_fpu_activated:
+    elif fuzzerstate.is_fpu_activated:
         # Else, we arbitrate randomly between changing the rounding mode and turning off the FPU
         do_change_rounding_mode = random.random() < fuzzerstate.proba_change_rm
         if do_change_rounding_mode:
-            return create_rmswitch_instrobjs(fuzzerstate)
+            ret = create_rmswitch_instrobjs(fuzzerstate)
         else:
             fuzzerstate.is_fpu_activated = False
             rd = 0 # Do not read the value because for triaging we want to be ablw to remove these instructions
-            return [CSRRegInstruction("csrrc", rd, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
+            ret = [CSRRegInstruction("csrrc", rd, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
     else:
         rd = 0 # WARL
         fuzzerstate.is_fpu_activated = True
-        return [CSRRegInstruction("csrrs", rd, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
+        ret = [CSRRegInstruction("csrrs", rd, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
+    
+    if len(ret) == 1: # Equivalent to FPU enable/disable
+        fuzzerstate.add_fpu_coord()
+    return ret 
