@@ -64,8 +64,9 @@ def gen_initial_basic_block(fuzzerstate, offset_addr: int, csr_init_rounding_mod
             curr_addr += 8
             # pmpaddr0
             if fuzzerstate.is_design_64bit:
+                # Given that the top 10 bits of the pmpaddr registers are WARL, we can as well ignore this slli operation.
                 fuzzerstate.add_instruction(RegImmInstruction("addi", 1, 0, 1, fuzzerstate.is_design_64bit))
-                fuzzerstate.add_instruction(RegImmInstruction("slli", 1, 0, 0x36, fuzzerstate.is_design_64bit))
+                fuzzerstate.add_instruction(RegImmInstruction("slli", 1, 1, 0x36, fuzzerstate.is_design_64bit))
                 fuzzerstate.add_instruction(RegImmInstruction("addi", 1, 1, -1, fuzzerstate.is_design_64bit))
                 fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.PMPADDR0))          
                 curr_addr += 16
