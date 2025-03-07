@@ -11,7 +11,7 @@ from params.fuzzparams import MemaddrPickPolicy, MEMADDR_PICK_POLICY_WEIGTHS
 
 # Helper function for the basic blocks
 def is_instrstr_load(instr_str: str):
-    return instr_str in ("lb", "lh", "lhu", "lw", "lwu", "flw", "ld", "fld")
+    return instr_str in ("lb", "lh", "lhu", "lw", "lwu", "flw", "ld", "fld", "lbu")
 
 # Helper function for the basic blocks
 def get_alignment_bits(instr_str: str):
