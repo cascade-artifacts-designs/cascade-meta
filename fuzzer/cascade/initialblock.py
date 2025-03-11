@@ -68,7 +68,7 @@ def gen_initial_basic_block(fuzzerstate, offset_addr: int, csr_init_rounding_mod
                 fuzzerstate.add_instruction(RegImmInstruction("addi", 1, 0, 1, fuzzerstate.is_design_64bit))
                 fuzzerstate.add_instruction(RegImmInstruction("slli", 1, 1, 0x36, fuzzerstate.is_design_64bit))
                 fuzzerstate.add_instruction(RegImmInstruction("addi", 1, 1, -1, fuzzerstate.is_design_64bit))
-                fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.PMPADDR0))          
+                fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.PMPADDR0))
                 curr_addr += 16
             else:
                 fuzzerstate.add_instruction(RegImmInstruction("addi", 1, 0, -1, fuzzerstate.is_design_64bit))
@@ -99,7 +99,7 @@ def gen_initial_basic_block(fuzzerstate, offset_addr: int, csr_init_rounding_mod
     if fuzzerstate.design_has_fpu:
         # FUTURE Create dependencies on FPU_ENDIS_REGISTER_ID
         # Prepare FPU_ENDIS_REGISTER_ID, which will be used across the program's execution
-        fuzzerstate.add_instruction(ImmRdInstruction("lui", FPU_ENDIS_REGISTER_ID, 0b10, fuzzerstate.is_design_64bit))
+        fuzzerstate.add_instruction(ImmRdInstruction("lui", FPU_ENDIS_REGISTER_ID, 0b110, fuzzerstate.is_design_64bit))
         # Enable the FPU
         fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS))
         # Set the initial rounding mode to zero initially, arbitrarily. We arbitrarily use the register x1 as an intermediate register
@@ -107,9 +107,12 @@ def gen_initial_basic_block(fuzzerstate, offset_addr: int, csr_init_rounding_mod
         fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.FCSR))
         curr_addr += 16 # NO_COMPRESSED
 
+    fuzzerstate.add_instruction(ImmRdInstruction("lui", 1, 0b10, fuzzerstate.is_design_64bit))
+    curr_addr += 4 # NO_COMPRESSED
+
     if fuzzerstate.design_has_supervisor_mode or fuzzerstate.design_has_user_mode:
-        fuzzerstate.add_instruction(RegImmInstruction("srli", MPP_TOP_ENDIS_REGISTER_ID, FPU_ENDIS_REGISTER_ID, 1, fuzzerstate.is_design_64bit))
-        fuzzerstate.add_instruction(RegImmInstruction("srli", MPP_BOTH_ENDIS_REGISTER_ID, FPU_ENDIS_REGISTER_ID, 2, fuzzerstate.is_design_64bit))
+        fuzzerstate.add_instruction(RegImmInstruction("srli", MPP_TOP_ENDIS_REGISTER_ID, 1, 1, fuzzerstate.is_design_64bit))
+        fuzzerstate.add_instruction(RegImmInstruction("srli", MPP_BOTH_ENDIS_REGISTER_ID, 1, 2, fuzzerstate.is_design_64bit))
         fuzzerstate.add_instruction(R12DInstruction("or", MPP_BOTH_ENDIS_REGISTER_ID, MPP_BOTH_ENDIS_REGISTER_ID, MPP_TOP_ENDIS_REGISTER_ID))
         # Just for the alignment. Could be removed if we improved the alignment prediction. FUTURE.
         fuzzerstate.add_instruction(RegImmInstruction("addi", 0, 0, 0, fuzzerstate.is_design_64bit))
@@ -121,7 +124,7 @@ def gen_initial_basic_block(fuzzerstate, offset_addr: int, csr_init_rounding_mod
 
     if not ("vexriscv" in fuzzerstate.design_name and is_forbid_vexriscv_csrs()):
         if fuzzerstate.design_has_user_mode:
-            fuzzerstate.add_instruction(RegImmInstruction("srli", SPP_ENDIS_REGISTER_ID, FPU_ENDIS_REGISTER_ID, 5, fuzzerstate.is_design_64bit))
+            fuzzerstate.add_instruction(RegImmInstruction("srli", SPP_ENDIS_REGISTER_ID, 1, 5, fuzzerstate.is_design_64bit))
             curr_addr += 4 # NO_COMPRESSED
             # While it is not necesary to set the mpp initially, it is convenient to do so. If we don't, then we should adapt the initial values (typically to None) in privilegestate.py
             fuzzerstate.add_instruction(CSRRegInstruction("csrrs", 0, SPP_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS))
@@ -173,7 +176,7 @@ def gen_initial_basic_block(fuzzerstate, offset_addr: int, csr_init_rounding_mod
     for _ in range(num_reginit_vals):
         fuzzerstate.initial_reg_data_content.append(0 if random.random() < fuzzerstate.proba_reg_starts_with_zero else random.randrange(1 << 64))
 
-    # If there will be padding between the instructions and data, to ensure proper alignment of doubleword load and store ops for 64-bit CPUs 
+    # If there will be padding between the instructions and data, to ensure proper alignment of doubleword load and store ops for 64-bit CPUs
     has_padding = bool((curr_addr+4) & 0x7) != 0
     if DO_ASSERT:
         assert expect_padding == has_padding, f"{expect_padding} != {has_padding}"
