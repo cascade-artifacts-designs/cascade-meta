@@ -156,9 +156,6 @@ def gen_basicblock(fuzzerstate):
         match curr_isa_class:
             # If this was a JAL due to reaching the max authorized number of instructions
             case  ISAInstrClass.JAL if fuzzerstate.has_reached_max_instr_num():
-                gen_bb_addr_ret = gen_next_bb_addr(fuzzerstate, curr_isa_class, curr_addr, curr_alloc_cursor)
-                assert gen_bb_addr_ret, \
-                    "We should have returned earlier if we reached the max number of instructions."
                 instr_str = gen_next_instrstr_from_isaclass(curr_isa_class, fuzzerstate)
                 assert instr_str == 'jal', \
                     f"Unexpected instruction string `{instr_str}`"
