@@ -1117,10 +1117,10 @@ class MisalignedMemInstruction(ExceptionInstruction):
           not is_load,                                   # MISALIGNED_SH
           not is_load,                                   # MISALIGNED_SW
           (not is_load) and fuzzerstate.is_design_64bit, # MISALIGNED_SD
-          is_load and fuzzerstate.design_has_fpu,        # MISALIGNED_FLW
-          (not is_load) and fuzzerstate.design_has_fpu,  # MISALIGNED_FSW
-          is_load and fuzzerstate.design_has_fpud,       # MISALIGNED_FLD
-          (not is_load) and fuzzerstate.design_has_fpud  # MISALIGNED_FSD
+          is_load and fuzzerstate.design_has_fpu and fuzzerstate.is_fpu_activated,        # MISALIGNED_FLW
+          (not is_load) and fuzzerstate.design_has_fpu and fuzzerstate.is_fpu_activated,  # MISALIGNED_FSW
+          is_load and fuzzerstate.design_has_fpud and fuzzerstate.is_fpu_activated,       # MISALIGNED_FLD
+          (not is_load) and fuzzerstate.design_has_fpud and fuzzerstate.is_fpu_activated  # MISALIGNED_FSD
         ]
         meminstr_type = random.choices(range(len(meminstr_type_weights)), meminstr_type_weights)[0]
         # Third, the destination register for loads, and the source register for stores does not matter because will not be architecturally accessed.
@@ -1140,7 +1140,7 @@ class MisalignedMemInstruction(ExceptionInstruction):
             assert memrange_base >= 0, "memrange_base: %d" % memrange_base
             assert memrange_base + memrange_size <= fuzzerstate.memsize, "memrange_base: %d, memrange_size: %d, fuzzerstate.memsize: %d" % (memrange_base, memrange_size, fuzzerstate.memsize)
             assert memrange_size > curr_access_size, "memrange_size: %d, curr_access_size: %d" % (memrange_size, curr_access_size)
-        
+
         random_block = (random.randrange(memrange_base, memrange_base + memrange_size) // curr_access_size) * curr_access_size
         random_offset = random.randrange(1, curr_access_size)
         self.misaligned_addr = random_block + random_offset
@@ -1239,7 +1239,7 @@ class GenericCSRWriterInstruction():
             # These two CSRs are treated separately in TvecWriterInstruction
             assert csr_id != CSR_IDS.MTVEC and csr_id != CSR_IDS.STVEC
             # Currently to ease analysis, we impose val_to_write_spike == val_to_write_cpu
-            
+
         self.instr_str = 'GenericCSRWriterInstruction' # Just for compatibility with the fuzzer
 
         self.producer_id = producer_id
