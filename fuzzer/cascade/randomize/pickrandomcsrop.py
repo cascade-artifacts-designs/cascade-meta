@@ -13,14 +13,13 @@ import random
 
 from enum import Enum, auto
 
-class MachineCSROpCandidates64(Enum):
-    SCAUSE = auto()
-    MCAUSE = auto()
-    SSCRATCH = auto()
-    MSCRATCH = auto()
-    MINSTRET = auto()
-    MHPMCOUNTER3 = auto()
-    MHPMEVENT31 = auto()
+_machine_csrop_candidates64 = { CSR_IDS.SCAUSE, CSR_IDS.MCAUSE, CSR_IDS.SSCRATCH, CSR_IDS.MSCRATCH, CSR_IDS.MINSTRET, CSR_IDS.MHPMCOUNTER3, CSR_IDS.MHPMEVENT31 }
+
+_csrrwi_ranges = {
+    CSR_IDS.SCAUSE : 32,
+    CSR_IDS.MCAUSE : 16,
+    CSR_IDS.MINSTRET : 16
+}
 
 class MachineCSROpCandidates32(Enum):
     SCAUSE = auto()
@@ -39,37 +38,32 @@ def gen_random_csr_op(fuzzerstate):
     if DO_ASSERT:
         assert fuzzerstate.privilegestate.privstate in (PrivilegeStateEnum.MACHINE, PrivilegeStateEnum.SUPERVISOR)
 
+    available_csrs = _machine_csrop_candidates64
     if fuzzerstate.privilegestate.privstate == PrivilegeStateEnum.MACHINE:
         if fuzzerstate.is_design_64bit:
-            target_csr = None
-            while target_csr is None or (target_csr == MachineCSROpCandidates64.MINSTRET and is_no_interaction_minstret(fuzzerstate.design_name)):
-                target_csr = random.choice(list(MachineCSROpCandidates64))
+            if is_no_interaction_minstret(fuzzerstate.design_name):
+                available_csrs.discard(CSR_IDS.MINSTRET)
             if not fuzzerstate.design_has_supervisor_mode:
-                while target_csr in (MachineCSROpCandidates64.SCAUSE, MachineCSROpCandidates64.SSCRATCH):
-                    target_csr = random.choice(list(MachineCSROpCandidates64))
-            while 'cva6' in fuzzerstate.design_name and not is_tolerate_cva6_mhpmcounter() and not is_tolerate_cva6_mhpmevent31() and target_csr in (MachineCSROpCandidates64.MHPMCOUNTER3, MachineCSROpCandidates64.MHPMEVENT31):
-                target_csr = random.choice(list(MachineCSROpCandidates64))
+                available_csrs.discard(CSR_IDS.SCAUSE)
+                available_csrs.discard(CSR_IDS.SSCRATCH)
+            if 'cva6' in fuzzerstate.design_name and not is_tolerate_cva6_mhpmcounter() and not is_tolerate_cva6_mhpmevent31():
+                available_csrs.discard(CSR_IDS.MHPMCOUNTER3)
+                available_csrs.discard(CSR_IDS.MHPMEVENT31)
+            target_csr = random.choice(list(available_csrs))
 
-            if target_csr == MachineCSROpCandidates64.SCAUSE:
-                # According to the spec, the SCAUSE CSR must be able to hold bits 0 to 4. mret is not required to.
-                ret = CSRImmInstruction("csrrwi", fuzzerstate.intregpickstate.pick_int_outputreg(), random.randrange(32), CSR_IDS.SCAUSE)
-            elif target_csr == MachineCSROpCandidates64.MCAUSE:
-                ret = CSRImmInstruction("csrrwi", fuzzerstate.intregpickstate.pick_int_outputreg(), random.randrange(16), CSR_IDS.MCAUSE)
-            elif target_csr == MachineCSROpCandidates64.SSCRATCH:
-                    ret = CSRRegInstruction("csrrw", fuzzerstate.intregpickstate.pick_int_outputreg(), fuzzerstate.intregpickstate.pick_int_inputreg(), CSR_IDS.SSCRATCH)
-            elif target_csr == MachineCSROpCandidates64.MSCRATCH:
-                    ret = CSRRegInstruction("csrrw", fuzzerstate.intregpickstate.pick_int_outputreg(), fuzzerstate.intregpickstate.pick_int_inputreg(), CSR_IDS.MSCRATCH)
-            elif target_csr == MachineCSROpCandidates64.MINSTRET:
+            if width := _csrrwi_ranges.get(target_csr):
+                ret = CSRImmInstruction("csrrwi", fuzzerstate.intregpickstate.pick_int_outputreg(), random.randrange(width), target_csr)
+            elif target_csr == CSR_IDS.SSCRATCH or target_csr == CSR_IDS.MSCRATCH:
+                    ret = CSRRegInstruction("csrrw", fuzzerstate.intregpickstate.pick_int_outputreg(), fuzzerstate.intregpickstate.pick_int_inputreg(), target_csr)
+            elif target_csr == CSR_IDS.MINSTRET:
                 if fuzzerstate.is_minstret_inaccurate_because_ecall_ebreak or ("boom" in fuzzerstate.design_name and not is_tolerate_boom_minstret()):
-                    ret = CSRImmInstruction("csrrwi", 0, random.randrange(16), CSR_IDS.MINSTRET)
+                    ret = CSRImmInstruction("csrrwi", 0, random.randrange(16), target_csr)
                 else:
                     
-                    ret = CSRRegInstruction("csrrw", fuzzerstate.intregpickstate.pick_int_outputreg(), fuzzerstate.intregpickstate.pick_int_inputreg(), CSR_IDS.MINSTRET)
+                    ret = CSRRegInstruction("csrrw", fuzzerstate.intregpickstate.pick_int_outputreg(), fuzzerstate.intregpickstate.pick_int_inputreg(), target_csr)
                 fuzzerstate.is_minstret_inaccurate_because_ecall_ebreak = False
-            elif target_csr == MachineCSROpCandidates64.MHPMCOUNTER3:
-                ret = CSRImmInstruction("csrrwi", 0, random.randrange(16), CSR_IDS.MHPMCOUNTER3)
-            elif target_csr == MachineCSROpCandidates64.MHPMEVENT31:
-                ret = CSRImmInstruction("csrrwi", 0, random.randrange(16), CSR_IDS.MHPMEVENT31)
+            elif target_csr == CSR_IDS.MHPMCOUNTER3 or target_csr == CSR_IDS.MHPMEVENT31:
+                ret = CSRImmInstruction("csrrwi", 0, random.randrange(16), target_csr)
             else:
                 raise Exception("Unexpected target_csr: {}".format(target_csr))
         else:
