@@ -135,7 +135,7 @@ if __TOLERATE_PICORV32_READHPM_NOCSRRS:
 # This prevents detecting the other bugs when using the pre-fpu-fix Vexriscv version.
 __FORBID_VEXRISCV_CSRS = False
 def is_forbid_vexriscv_csrs():
-    return __FORBID_VEXRISCV_CSRS
+    return True
 if __FORBID_VEXRISCV_CSRS:
     print('WARNING: Forbidding one bug: __FORBID_VEXRISCV_CSRS')
 

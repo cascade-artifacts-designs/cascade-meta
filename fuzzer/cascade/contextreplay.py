@@ -4,6 +4,9 @@
 
 # This module is responsible for setting up the context for pruning the basic blocks and instructions happening before the faulty instruction.
 
+import logging
+logger = logging.getLogger(__name__)
+
 from dataclasses import dataclass
 from params.runparams import DO_ASSERT
 from params.fuzzparams import MAX_NUM_PICKABLE_REGS, MPP_TOP_ENDIS_REGISTER_ID, MPP_BOTH_ENDIS_REGISTER_ID
@@ -107,6 +110,7 @@ def gen_context_setter(fuzzerstate, saved_context, next_jmp_addr: int):
         fuzzerstate.ctxsv_bb.append(IntLoadInstruction("lwu" if fuzzerstate.is_design_64bit else "lw", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
         curr_addr += 4 # NO_COMPRESSED
         # Write the value into fcsr
+        logger.warning(f"[contextreplay:110] Creating CSR instruction: csrrw to FCSR (context restore)")
         fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.FCSR))
         curr_addr += 4 # NO_COMPRESSED
 
@@ -115,6 +119,7 @@ def gen_context_setter(fuzzerstate, saved_context, next_jmp_addr: int):
         addr_csr_loads[CSR_IDS.MEPC] = curr_addr
         fuzzerstate.ctxsv_bb.append(None)
         fuzzerstate.ctxsv_bb.append(IntLoadInstruction("lwu" if fuzzerstate.is_design_64bit else "lw", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
+        logger.warning(f"[contextreplay:118] Creating CSR instruction: csrrw to MEPC (context restore)")
         fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.MEPC))
         curr_addr += 12 # NO_COMPRESSED
 
@@ -123,6 +128,7 @@ def gen_context_setter(fuzzerstate, saved_context, next_jmp_addr: int):
         addr_csr_loads[CSR_IDS.SEPC] = curr_addr
         fuzzerstate.ctxsv_bb.append(None)
         fuzzerstate.ctxsv_bb.append(IntLoadInstruction("lwu" if fuzzerstate.is_design_64bit else "lw", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
+        logger.warning(f"[contextreplay:126] Creating CSR instruction: csrrw to SEPC (context restore)")
         fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.SEPC))
         curr_addr += 12 # NO_COMPRESSED
 
@@ -130,6 +136,7 @@ def gen_context_setter(fuzzerstate, saved_context, next_jmp_addr: int):
     addr_csr_loads[CSR_IDS.MCAUSE] = curr_addr
     fuzzerstate.ctxsv_bb.append(None)
     fuzzerstate.ctxsv_bb.append(IntLoadInstruction("lwu" if fuzzerstate.is_design_64bit else "lw", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
+    logger.warning(f"[contextreplay:133] Creating CSR instruction: csrrw to MCAUSE (context restore)")
     fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.MCAUSE))
     curr_addr += 12 # NO_COMPRESSED
 
@@ -138,6 +145,7 @@ def gen_context_setter(fuzzerstate, saved_context, next_jmp_addr: int):
         addr_csr_loads[CSR_IDS.SCAUSE] = curr_addr
         fuzzerstate.ctxsv_bb.append(None)
         fuzzerstate.ctxsv_bb.append(IntLoadInstruction("lwu" if fuzzerstate.is_design_64bit else "lw", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
+        logger.warning(f"[contextreplay:141] Creating CSR instruction: csrrw to SCAUSE (context restore)")
         fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.SCAUSE))
         curr_addr += 12 # NO_COMPRESSED
 
@@ -148,6 +156,7 @@ def gen_context_setter(fuzzerstate, saved_context, next_jmp_addr: int):
         fuzzerstate.ctxsv_bb.append(IntLoadInstruction("ld", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
     else:
         fuzzerstate.ctxsv_bb.append(IntLoadInstruction("lwu" if fuzzerstate.is_design_64bit else "lw", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
+    logger.warning(f"[contextreplay:151] Creating CSR instruction: csrrw to MSCRATCH (context restore)")
     fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.MSCRATCH))
     curr_addr += 12 # NO_COMPRESSED
 
@@ -158,6 +167,7 @@ def gen_context_setter(fuzzerstate, saved_context, next_jmp_addr: int):
             fuzzerstate.ctxsv_bb.append(IntLoadInstruction("ld", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
         else:
             fuzzerstate.ctxsv_bb.append(IntLoadInstruction("lwu" if fuzzerstate.is_design_64bit else "lw", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
+        logger.warning(f"[contextreplay:161] Creating CSR instruction: csrrw to SSCRATCH (context restore)")
         fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.SSCRATCH))
         curr_addr += 12 # NO_COMPRESSED
 
@@ -167,6 +177,7 @@ def gen_context_setter(fuzzerstate, saved_context, next_jmp_addr: int):
         addr_csr_loads[CSR_IDS.MTVEC] = curr_addr
         fuzzerstate.ctxsv_bb.append(None)
         fuzzerstate.ctxsv_bb.append(IntLoadInstruction("lwu" if fuzzerstate.is_design_64bit else "lw", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
+        logger.warning(f"[contextreplay:170] Creating CSR instruction: csrrw to MTVEC (context restore)")
         fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.MTVEC))
         curr_addr += 12 # NO_COMPRESSED
 
@@ -175,6 +186,7 @@ def gen_context_setter(fuzzerstate, saved_context, next_jmp_addr: int):
         addr_csr_loads[CSR_IDS.STVEC] = curr_addr
         fuzzerstate.ctxsv_bb.append(None)
         fuzzerstate.ctxsv_bb.append(IntLoadInstruction("lwu" if fuzzerstate.is_design_64bit else "lw", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
+        logger.warning(f"[contextreplay:178] Creating CSR instruction: csrrw to STVEC (context restore)")
         fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.STVEC))
         curr_addr += 12 # NO_COMPRESSED
 
@@ -183,6 +195,7 @@ def gen_context_setter(fuzzerstate, saved_context, next_jmp_addr: int):
         addr_csr_loads[CSR_IDS.MEDELEG] = curr_addr
         fuzzerstate.ctxsv_bb.append(None)
         fuzzerstate.ctxsv_bb.append(IntLoadInstruction("lwu" if fuzzerstate.is_design_64bit else "lw", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
+        logger.warning(f"[contextreplay:186] Creating CSR instruction: csrrw to MEDELEG (context restore)")
         fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.MEDELEG))
         curr_addr += 12 # NO_COMPRESSED
 
@@ -191,6 +204,7 @@ def gen_context_setter(fuzzerstate, saved_context, next_jmp_addr: int):
     if fuzzerstate.is_design_64bit:
         fuzzerstate.ctxsv_bb.append(None)
         fuzzerstate.ctxsv_bb.append(IntLoadInstruction("ld", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
+        logger.warning(f"[contextreplay:194] Creating CSR instruction: csrrw to MSTATUS (context restore, 64-bit)")
         fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.MSTATUS))
         curr_addr += 12 # NO_COMPRESSED
     else:
@@ -200,7 +214,9 @@ def gen_context_setter(fuzzerstate, saved_context, next_jmp_addr: int):
         fuzzerstate.ctxsv_bb.append(None)
         fuzzerstate.ctxsv_bb.append(IntLoadInstruction("lw", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
         fuzzerstate.ctxsv_bb.append(IntLoadInstruction("lw", 2, 2, 0, -1, fuzzerstate.is_design_64bit))
+        logger.warning(f"[contextreplay:203] Creating CSR instruction: csrrw to MSTATUS (context restore, 32-bit)")
         fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.MSTATUS))
+        logger.warning(f"[contextreplay:204] Creating CSR instruction: csrrw to MSTATUSH (context restore, 32-bit)")
         fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 2, CSR_IDS.MSTATUSH))
         curr_addr += 24 # NO_COMPRESSED
 
@@ -209,6 +225,7 @@ def gen_context_setter(fuzzerstate, saved_context, next_jmp_addr: int):
     if fuzzerstate.is_design_64bit:
         fuzzerstate.ctxsv_bb.append(None)
         fuzzerstate.ctxsv_bb.append(IntLoadInstruction("ld", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
+        logger.warning(f"[contextreplay:212] Creating CSR instruction: csrrw to MINSTRET (context restore, 64-bit)")
         fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.MINSTRET))
         curr_addr += 12 # NO_COMPRESSED
     else:
@@ -217,7 +234,9 @@ def gen_context_setter(fuzzerstate, saved_context, next_jmp_addr: int):
         fuzzerstate.ctxsv_bb.append(None)
         fuzzerstate.ctxsv_bb.append(IntLoadInstruction("lw", 1, 1, 0, -1, fuzzerstate.is_design_64bit))
         fuzzerstate.ctxsv_bb.append(IntLoadInstruction("lw", 2, 2, 0, -1, fuzzerstate.is_design_64bit))
+        logger.warning(f"[contextreplay:220] Creating CSR instruction: csrrw to MINSTRET (context restore, 32-bit)")
         fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.MINSTRET))
+        logger.warning(f"[contextreplay:221] Creating CSR instruction: csrrw to MINSTRETH (context restore, 32-bit)")
         fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 2, CSR_IDS.MINSTRETH))
         curr_addr += 24 # NO_COMPRESSED
     minstret_base_addr = curr_addr
@@ -230,15 +249,19 @@ def gen_context_setter(fuzzerstate, saved_context, next_jmp_addr: int):
     if saved_context.privilege == PrivilegeStateEnum.SUPERVISOR or saved_context.privilege == PrivilegeStateEnum.USER:
         # Populate mpp
         if saved_context.privilege == PrivilegeStateEnum.SUPERVISOR:
+            logger.warning(f"[contextreplay:233] Creating CSR instruction: csrrs to MSTATUS (privilege restore, Supervisor)")
             fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrs", 0, MPP_BOTH_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS))
+            logger.warning(f"[contextreplay:234] Creating CSR instruction: csrrc to MSTATUS (privilege restore, Supervisor)")
             fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrc", 0, MPP_TOP_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS))
         else:
+            logger.warning(f"[contextreplay:236] Creating CSR instruction: csrrc to MSTATUS (privilege restore, User)")
             fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrc", 0, MPP_BOTH_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS))
             fuzzerstate.ctxsv_bb.append(RegImmInstruction("addi", 0, 0, 0, fuzzerstate.is_design_64bit, is_rd_nonpickable_ok=True))
         curr_addr += 8 # NO_COMPRESSED
         # Populate mepc
         mepc_target = curr_addr + 12
         fuzzerstate.ctxsv_bb.append(RegImmInstruction("addi", 1, MAX_NUM_PICKABLE_REGS, mepc_target-fuzzerstate.ctxsv_bb_base_addr, fuzzerstate.is_design_64bit, is_rd_nonpickable_ok=True)) # The reg `MAX_NUM_PICKABLE_REGS` contains the start address of the context sette, is_rd_nonpickable_ok=Truer
+        logger.warning(f"[contextreplay:242] Creating CSR instruction: csrrw to MEPC (privilege restore)")
         fuzzerstate.ctxsv_bb.append(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.MEPC))
         fuzzerstate.ctxsv_bb.append(PrivilegeDescentInstruction(True)) # mret
         # Add 2 nops for the mret, just in case the CPU is not doing great with mret sometimes :)

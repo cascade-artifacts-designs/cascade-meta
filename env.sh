@@ -4,14 +4,11 @@
 
 # absolute path we are executing from
 
-if [ "$0" != "$BASH_SOURCE" -a "$BASH_SOURCE" ]
-then  # sourced in bash
-	myroot=$(dirname $(realpath -- $BASH_SOURCE))
+if [ "$0" != "$BASH_SOURCE" -a "$BASH_SOURCE" ]; then # sourced in bash
+  myroot=$(dirname $(realpath -- $BASH_SOURCE))
 else
-	myroot=$(cd $(dirname $0) && pwd -P)
+  myroot=$(cd $(dirname $0) && pwd -P)
 fi
-
-echo "metarepo root: $myroot"
 
 # Set meta repo root
 export CASCADE_META_ROOT=$myroot
@@ -49,67 +46,60 @@ export MODELSIM_MAX_INSTANCES=100
 export MODELSIM_WORKROOT=.
 
 HOSTNAME=$(hostname)
-if [[ "${HOSTNAME}" == *"eda3"* ]]; # ETHZ EDA server
-then
-    # Example customization
-    export CASCADE_JOBS=14
+if [[ "${HOSTNAME}" == *"eda3"* ]]; then # ETHZ EDA server
+  # Example customization
+  export CASCADE_JOBS=14
 
-    ulimit -n 4096 # many FD's
-    export CASCADE_DATADIR=/data/"${USER}"/data-eda3
-    # export CASCADE_DATADIR=/home/flsolt/cascade-data
-elif [[ "${HOSTNAME}" == *"cn112"* ]]; # ETHZ cn112
-then
-    # Example customization
-    export CASCADE_JOBS=14
+  ulimit -n 4096 # many FD's
+  export CASCADE_DATADIR=/data/"${USER}"/data-eda3
+  # export CASCADE_DATADIR=/home/flsolt/cascade-data
+elif [[ "${HOSTNAME}" == *"cn112"* ]]; then # ETHZ cn112
+  # Example customization
+  export CASCADE_JOBS=14
 
-    ulimit -n 4096 # many FD's
-    export CASCADE_DATADIR=/data/"${USER}"/data
-    export MODELSIM_VERSION=
-    export MODELSIM_WORKROOT=/data/"${USER}"/modelsimfuzz
-elif [[ "${HOSTNAME}" == *"cn106"* ]]; # ETHZ cn106
-then
-    # Example customization
-    export CASCADE_JOBS=250
-    export CASCADE_DOCKER_MNT_DIR=/scratch/"${USER}"/shareddir
-    export MODELSIM_MAX_INSTANCES=256
-    export CASCADE_RISCV_BITWIDTH=32
+  ulimit -n 4096 # many FD's
+  export CASCADE_DATADIR=/data/"${USER}"/data
+  export MODELSIM_VERSION=
+  export MODELSIM_WORKROOT=/data/"${USER}"/modelsimfuzz
+elif [[ "${HOSTNAME}" == *"cn106"* ]]; then # ETHZ cn106
+  # Example customization
+  export CASCADE_JOBS=250
+  export CASCADE_DOCKER_MNT_DIR=/scratch/"${USER}"/shareddir
+  export MODELSIM_MAX_INSTANCES=256
+  export CASCADE_RISCV_BITWIDTH=32
 
-    ulimit -n 10000 # many FD's
-    export CASCADE_DATADIR=/scratch/"${USER}"/data/python-tmp
-    export MODELSIM_VERSION=
-    export MODELSIM_WORKROOT=/scratch/"${USER}"/modelsimfuzz
-elif [[ "${HOSTNAME}" == *"cn107"* ]]; # ETHZ cn107
-then
-    # Example customization
-    export CASCADE_JOBS=250
-    export MODELSIM_MAX_INSTANCES=256
+  ulimit -n 10000 # many FD's
+  export CASCADE_DATADIR=/scratch/"${USER}"/data/python-tmp
+  export MODELSIM_VERSION=
+  export MODELSIM_WORKROOT=/scratch/"${USER}"/modelsimfuzz
+elif [[ "${HOSTNAME}" == *"cn107"* ]]; then # ETHZ cn107
+  # Example customization
+  export CASCADE_JOBS=250
+  export MODELSIM_MAX_INSTANCES=256
 
-    ulimit -n 4096 # many FD's
-    export CASCADE_DATADIR=/scratch/"${USER}"/data
-    export MODELSIM_VERSION=
-    export MODELSIM_WORKROOT=/scratch/"${USER}"/modelsimfuzz
-elif [ "$USER" = flsolt ] # ETHZ Flavien big server
-then
-    # Example customization
-    export CASCADE_JOBS=250
-    export MODELSIM_MAX_INSTANCES=256
+  ulimit -n 4096 # many FD's
+  export CASCADE_DATADIR=/scratch/"${USER}"/data
+  export MODELSIM_VERSION=
+  export MODELSIM_WORKROOT=/scratch/"${USER}"/modelsimfuzz
+elif [ "$USER" = flsolt ]; then # ETHZ Flavien big server
+  # Example customization
+  export CASCADE_JOBS=250
+  export MODELSIM_MAX_INSTANCES=256
 
-    ulimit -n 10000 # many FD's
-    export CASCADE_DATADIR=/scratch/"${USER}"/data
-    export MODELSIM_VERSION=
-    export MODELSIM_WORKROOT=/scratch/"${USER}"/modelsimfuzz
-elif [ "$USER" = user ] # ETHZ Flavien laptop
-then
-    export CASCADE_JOBS=10
+  ulimit -n 10000 # many FD's
+  export CASCADE_DATADIR=/scratch/"${USER}"/data
+  export MODELSIM_VERSION=
+  export MODELSIM_WORKROOT=/scratch/"${USER}"/modelsimfuzz
+elif [ "$USER" = user ]; then # ETHZ Flavien laptop
+  export CASCADE_JOBS=10
 
-    ulimit -n 10000 # many FD's
-    export CASCADE_DATADIR=/home/"${USER}"/cascade-data
-elif [ -z ${IS_DOCKER+x} ]
-then
-    export CASCADE_JOBS=250
+  ulimit -n 10000 # many FD's
+  export CASCADE_DATADIR=/home/"${USER}"/cascade-data
+elif [ -z ${IS_DOCKER+x} ]; then
+  export CASCADE_JOBS=250
 
-    ulimit -n 10000 # many FD's
-    export CASCADE_DATADIR=/cascade-data
+  ulimit -n 10000 # many FD's
+  export CASCADE_DATADIR=/cascade-data
 fi
 
 # Where should our python venv be?

@@ -22,7 +22,7 @@ if __name__ == '__main__':
         target_dir = sys.argv[2]
     num_cores = int(os.getenv('CASCADE_JOBS', 160))
 
-    gen_many_elfs('rocket', num_cores, num_elfs, target_dir)
+    gen_many_elfs('risc0', num_cores, num_elfs, target_dir)
 
 else:
     raise Exception("This module must be at the toplevel.")

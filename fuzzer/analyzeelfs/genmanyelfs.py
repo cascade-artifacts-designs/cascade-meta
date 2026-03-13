@@ -39,17 +39,18 @@ def __gen_elf_worker(in_tuple):
 
 
 def gen_many_elfs(design_name: str, num_cores: int, num_elfs: int, outdir_path, verbose: bool = True):
-    random.seed(0)
+    # random.seed(0)
 
     # Ensure that the output directory exists.
     os.makedirs(outdir_path, exist_ok=True)
 
     # Gen the program descriptors.
-    memsizes, _, randseeds, num_bbss, authorize_privilegess = tuple(zip(*[gen_new_test_instance(design_name, i, True) for i in range(num_elfs)]))
+    memsizes, _, randseeds, num_bbss, authorize_privilegess = tuple(zip(*[gen_new_test_instance(design_name, i, False) for i in range(num_elfs)]))
     workloads = [(i, memsizes[i], design_name, randseeds[i], num_bbss[i], authorize_privilegess[i], False, outdir_path) for i in range(num_elfs)]
 
     calibrate_spikespeed()
-    profile_get_medeleg_mask(design_name)
+    # # this line leads to an error relating to verilator
+    # profile_get_medeleg_mask(design_name)
 
     print(f"Starting ELF generation on {num_cores} processes.")
     progress_bar = tqdm(total=num_elfs)

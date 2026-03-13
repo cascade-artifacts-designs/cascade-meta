@@ -464,8 +464,9 @@ def gen_random_data_block(fuzzerstate):
         assert fuzzerstate.random_data_block_start_addr is not None, f"Maybe you should create the random data block earlier in the creation of the test case."
     fuzzerstate.memview.alloc_mem_range(fuzzerstate.random_data_block_start_addr, lenbytes)
     # Generate the random data
-    for _ in range(fuzzerstate.random_data_block_start_addr, fuzzerstate.random_data_block_end_addr, 4):
-        fuzzerstate.random_block_content4by4bytes.append(random.randrange(0, 2**32))
+    for addr in range(fuzzerstate.random_data_block_start_addr, fuzzerstate.random_data_block_end_addr, 4):
+        random_value = random.randrange(0, 2**32)
+        fuzzerstate.random_block_content4by4bytes.append(random_value)
 
 # This must be done early, say, just after generating the first basic block, to 
 # ensure that we have enough space.

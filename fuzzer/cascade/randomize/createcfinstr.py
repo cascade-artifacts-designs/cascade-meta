@@ -85,6 +85,10 @@ def _create_BranchInstruction(instr_str: str, fuzzerstate, curr_addr: int, iscom
 
             target_addr_in_random_data_block = random.randrange(lowest_random_data_reachable_addr//2, highest_random_data_reachable_addr//2)*2
             imm = target_addr_in_random_data_block-curr_addr
+            
+            import logging
+            logger = logging.getLogger(__name__)
+            # logger.warning(f"createcfinstr.py: Creating branch from 0x{curr_addr:x} targeting random data at 0x{target_addr_in_random_data_block:x}")
         else:
             imm = gen_random_imm(instr_str, fuzzerstate.is_design_64bit)
     

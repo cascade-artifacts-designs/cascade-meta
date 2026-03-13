@@ -4,6 +4,9 @@
 
 # This module is responsible for picking specific operations among exceptions.
 
+import logging
+logger = logging.getLogger(__name__)
+
 from cascade.cfinstructionclasses import JALInstruction, SimpleIllegalInstruction, SimpleExceptionEncapsulator, MisalignedMemInstruction, EcallEbreakInstruction, TvecWriterInstruction, EPCWriterInstruction, GenericCSRWriterInstruction, CSRRegInstruction, PrivilegeDescentInstruction, CSRRegInstructions, Float3Instruction, Float3Instructions
 from cascade.privilegestate import PrivilegeStateEnum
 from cascade.randomize.createcfinstr import gen_random_rounding_mode
@@ -89,6 +92,7 @@ def pick_illegal_instruction(is_mtvec, fuzzerstate, old_privilege):
     if "vexriscv" in fuzzerstate.design_name and is_tolerate_vexriscv_fpu_leak() and fuzzerstate.is_fpu_activated:
         rs1 = random.randrange(MAX_NUM_PICKABLE_REGS)
         rd = random.randrange(MAX_NUM_PICKABLE_REGS)
+        logger.warning(f"[pickexceptionop:92] Creating CSR instruction: csrrw to FCSR (vexriscv FPU leak)")
         return SimpleExceptionEncapsulator(is_mtvec, None, CSRRegInstruction('csrrw', rd, rs1, CSR_IDS.FCSR))
 
     if "vexriscv" in fuzzerstate.design_name and is_forbid_vexriscv_csrs():
@@ -115,18 +119,29 @@ def pick_illegal_instruction(is_mtvec, fuzzerstate, old_privilege):
         else:
             candidate_instructions = [
                 SimpleExceptionEncapsulator(is_mtvec, None, SimpleIllegalInstruction(is_mtvec)),
-                SimpleExceptionEncapsulator(is_mtvec, None, CSRRegInstruction("csrrw", random.randrange(fuzzerstate.num_pickable_regs), random.randrange(fuzzerstate.num_pickable_regs), 0xCCA))
             ]
+            logger.warning(f"[pickexceptionop:119] Creating CSR instruction: csrrw to CSR 0xCCA (illegal CSR, Machine)")
+            candidate_instructions.append(
+                SimpleExceptionEncapsulator(is_mtvec, None, CSRRegInstruction("csrrw", random.randrange(fuzzerstate.num_pickable_regs), random.randrange(fuzzerstate.num_pickable_regs), 0xCCA))
+            )
     elif old_privilege == PrivilegeStateEnum.SUPERVISOR:
         candidate_instructions = [
             SimpleExceptionEncapsulator(is_mtvec, None, PrivilegeDescentInstruction(True)),
-            SimpleExceptionEncapsulator(is_mtvec, None, CSRRegInstruction("csrrw", random.randrange(fuzzerstate.num_pickable_regs), random.randrange(fuzzerstate.num_pickable_regs), random.choice(INTERESTING_CSRS_INACCESSIBLE_FROM_SUPERVISOR))),
         ]
+        selected_csr = random.choice(INTERESTING_CSRS_INACCESSIBLE_FROM_SUPERVISOR)
+        logger.warning(f"[pickexceptionop:130] Creating CSR instruction: csrrw to CSR {hex(selected_csr)} (inaccessible from Supervisor)")
+        candidate_instructions.append(
+            SimpleExceptionEncapsulator(is_mtvec, None, CSRRegInstruction("csrrw", random.randrange(fuzzerstate.num_pickable_regs), random.randrange(fuzzerstate.num_pickable_regs), selected_csr)),
+        )
     elif old_privilege == PrivilegeStateEnum.USER:
         candidate_instructions = [
             SimpleExceptionEncapsulator(is_mtvec, None, random.choice([PrivilegeDescentInstruction(True), PrivilegeDescentInstruction(False)])),
-            SimpleExceptionEncapsulator(is_mtvec, None, CSRRegInstruction("csrrw", random.randrange(fuzzerstate.num_pickable_regs), random.randrange(fuzzerstate.num_pickable_regs), random.choice(INTERESTING_CSRS_INACCESSIBLE_FROM_USER))),
         ]
+        selected_csr = random.choice(INTERESTING_CSRS_INACCESSIBLE_FROM_USER)
+        logger.warning(f"[pickexceptionop:139] Creating CSR instruction: csrrw to CSR {hex(selected_csr)} (inaccessible from User)")
+        candidate_instructions.append(
+            SimpleExceptionEncapsulator(is_mtvec, None, CSRRegInstruction("csrrw", random.randrange(fuzzerstate.num_pickable_regs), random.randrange(fuzzerstate.num_pickable_regs), selected_csr)),
+        )
     else:
         raise Exception("Unknown privilege state: " + str(old_privilege))
     ret = random.choice(candidate_instructions)
@@ -365,19 +380,24 @@ def gen_ppfill_instrs(fuzzerstate):
 
     if is_mpp:
         if target_privlvl == PrivilegeStateEnum.USER:
+            logger.warning(f"[pickexceptionop:368] Creating CSR instruction: csrrc to MSTATUS (MPP User)")
             ret = [CSRRegInstruction("csrrc", rd, MPP_BOTH_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
         elif target_privlvl == PrivilegeStateEnum.SUPERVISOR:
             # Could theretically be done in a single instruction if we had one more mask register.
+            logger.warning(f"[pickexceptionop:371] Creating CSR instructions: csrrs and csrrc to MSTATUS (MPP Supervisor)")
             ret = [CSRRegInstruction("csrrs", rd, MPP_BOTH_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS), CSRRegInstruction("csrrc", rd, MPP_TOP_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
         elif target_privlvl == PrivilegeStateEnum.MACHINE:
+            logger.warning(f"[pickexceptionop:373] Creating CSR instruction: csrrs to MSTATUS (MPP Machine)")
             ret = [CSRRegInstruction("csrrs", rd, MPP_BOTH_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
         else:
             raise NotImplementedError("Hypervisor mode not implemented")
     else:
         if target_privlvl == PrivilegeStateEnum.USER:
+            logger.warning(f"[pickexceptionop:378] Creating CSR instructions: csrrc to MSTATUS (SPP User)")
             ret = [CSRRegInstruction("csrrc", rd, SPP_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS),
                 CSRRegInstruction("csrrc", rd, SPP_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
         elif target_privlvl == PrivilegeStateEnum.SUPERVISOR:
+            logger.warning(f"[pickexceptionop:381] Creating CSR instructions: csrrs to MSTATUS (SPP Supervisor)")
             ret = [CSRRegInstruction("csrrs", rd, SPP_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS),
                 CSRRegInstruction("csrrs", rd, SPP_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
         else:

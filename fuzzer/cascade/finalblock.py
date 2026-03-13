@@ -4,13 +4,16 @@
 
 # This module defines the final block.
 
+import logging
+logger = logging.getLogger(__name__)
+
 from params.runparams import DO_ASSERT
 from rv.csrids import CSR_IDS
 from common.designcfgs import is_design_32bit, get_design_stop_sig_addr, get_design_reg_dump_addr, design_has_float_support, design_has_double_support, get_design_fpreg_dump_addr
 from params.fuzzparams import RDEP_MASK_REGISTER_ID, MAX_NUM_PICKABLE_REGS, MAX_NUM_PICKABLE_FLOATING_REGS, FPU_ENDIS_REGISTER_ID
 from cascade.privilegestate import PrivilegeStateEnum
 from rv.asmutil import li_into_reg
-from cascade.cfinstructionclasses import ImmRdInstruction, RegImmInstruction, IntStoreInstruction, FloatStoreInstruction, JALInstruction, SpecialInstruction, CSRRegInstruction
+from cascade.cfinstructionclasses import ImmRdInstruction, RegImmInstruction, IntStoreInstruction, FloatStoreInstruction, JALInstruction, SpecialInstruction, CSRRegInstruction, EcallEbreakInstruction
 
 def get_finalblock_max_size():
     return (10 + 2*MAX_NUM_PICKABLE_REGS + 2*MAX_NUM_PICKABLE_FLOATING_REGS - 1) * 4
@@ -50,10 +53,10 @@ def finalblock(fuzzerstate, design_name: str):
     ]
 
     # Store the register values to the register dump address
-    ret.append(SpecialInstruction("fence")) # Hopefully this prevents speculative execution of the stores
+    # ret.append(SpecialInstruction("fence")) # Hopefully this prevents speculative execution of the stores
     for reg_id in range(1, MAX_NUM_PICKABLE_REGS):
         ret.append(IntStoreInstruction("sd" if is_design_64bit else "sw", RDEP_MASK_REGISTER_ID, reg_id, 0, -1, is_design_64bit))
-        ret.append(SpecialInstruction("fence"))
+        # ret.append(SpecialInstruction("fence"))
 
     # Store the floating values as well, if FPU is supported and if there is no risk of it being deactivated
     if design_has_fpu and not fuzzerstate.is_fpu_activated:
@@ -62,12 +65,13 @@ def finalblock(fuzzerstate, design_name: str):
             assert get_design_fpreg_dump_addr(design_name) == regdump_addr + 8, f"We make the assumption that the FP regdump addr is the int regdump address + 8. However, currently, they are respectively {hex(get_design_fpreg_dump_addr(design_name))} and regdump_addr={hex(regdump_addr)}"
         if fuzzerstate.privilegestate.privstate == PrivilegeStateEnum.MACHINE:
             # Enable the FPU
+            logger.warning(f"[finalblock:65] Creating CSR instruction: csrrw to MSTATUS (FPU enable for finalblock)")
             ret.append(CSRRegInstruction("csrrw", 0, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS))
             fuzzerstate.is_fpu_activated = True
         if fuzzerstate.is_fpu_activated:
             for reg_id in range(MAX_NUM_PICKABLE_FLOATING_REGS):
                 ret.append(FloatStoreInstruction("fsd" if design_has_fpudouble else "fsw", RDEP_MASK_REGISTER_ID, reg_id, 8, -1, is_design_64bit))
-                ret.append(SpecialInstruction("fence"))
+                # ret.append(SpecialInstruction("fence"))
 
     ###
     # Stop request
@@ -75,19 +79,28 @@ def finalblock(fuzzerstate, design_name: str):
 
     lui_imm_stopreq, addi_imm_stopreq = li_into_reg(stopsig_addr)
 
-    # We re-purpose RDEP_MASK_REGISTER_ID, because we will not need it anymore.
-    # Compute the stop request address
+    # We re-purpose RDEP_MASK_REGISTER_ID for the stop signal address
     ret += [
         ImmRdInstruction("lui", RDEP_MASK_REGISTER_ID, lui_imm_stopreq, is_design_64bit),
         RegImmInstruction("addi", RDEP_MASK_REGISTER_ID, RDEP_MASK_REGISTER_ID, addi_imm_stopreq, is_design_64bit)
     ]
+    
+        # Termination sequence with ecall
+    # li t0, 0         # just zeroing t0 (possibly unused) - register 5
+    ret.append(RegImmInstruction("addi", 5, 0, 0, is_design_64bit))  # t0 = 0
+    
+    # li a7, 0         # syscall number 0 (custom) - register 17
+    ret.append(RegImmInstruction("addi", 17, 0, 0, is_design_64bit))  # a7 = 0
+    
+    # li a0, 0         # return code (0 = success) - register 10
+    ret.append(RegImmInstruction("addi", 10, 0, 0, is_design_64bit))  # a0 = 0
+    
+    # li a1, 1024      # optional code (e.g., meaning 'exit', etc.) - register 11
+    ret.append(RegImmInstruction("addi", 11, 0, 1024, is_design_64bit))  # a1 = 1024
+    
+    # ecall           # environment call → trap to simulator
+    ret.append(EcallEbreakInstruction("ecall"))
 
-    # Store the register values to the register dump address
-    ret.append(IntStoreInstruction("sd" if is_design_64bit else "sw", RDEP_MASK_REGISTER_ID, 0, 0 & 0xFFFF, -1, is_design_64bit))
-    ret.append(SpecialInstruction("fence"))
-
-    # Infinite loop in the end of the simulation
-    ret.append(JALInstruction("jal", 0, 0))
 
     if DO_ASSERT:
         assert len(ret) * 4 <= get_finalblock_max_size(), f"The final block is larger than expected: {len(ret) * 4} > {get_finalblock_max_size()}"

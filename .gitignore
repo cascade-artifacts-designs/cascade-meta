@@ -4,3 +4,17 @@ __pycache__
 transcript
 tmp
 figures
+toolchains
+artifacts
+venv
+target
+emulators
+.container-use
+.ai_docs
+**/.ai_docs
+.cursor/
+.roo
+CLAUDE.md
+ai_docs
+ai_plans/
+llms

@@ -81,5 +81,5 @@ def gen_elf_from_bbs(fuzzerstate, is_spike_resolution, prefixname: str, test_ide
     elfpath = os.path.join(PATH_TO_TMP, f"{prefixname}{test_identifier}.elf")
 
     # Generate the ELF object
-    gen_elf(curr_bytes, start_addr=fuzzerstate.bb_start_addr_seq[0], section_addr=start_addr, destination_path=elfpath, is_64bit=fuzzerstate.is_design_64bit)
+    gen_elf(curr_bytes, start_addr=start_addr, section_addr=start_addr, destination_path=elfpath, is_64bit=fuzzerstate.is_design_64bit)
     return elfpath

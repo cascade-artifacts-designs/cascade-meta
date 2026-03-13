@@ -1,4 +1,5 @@
 {
+    "risc0": "../../cascade-designs/cascade-risc0/cascade",
     "cva6": "../../cascade-designs/cascade-cva6/cascade",
     "cva6-c1": "../../cascade-designs/cascade-cva6-c1/cascade",
     "cva6-y1": "../../cascade-designs/cascade-cva6-y1/cascade",

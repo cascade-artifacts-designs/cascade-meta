@@ -4,6 +4,9 @@
 
 # This module defines the initial basic block of the program.
 
+import logging
+logger = logging.getLogger(__name__)
+
 from params.runparams import DO_ASSERT
 from rv.csrids import CSR_IDS
 from cascade.toleratebugs import is_forbid_vexriscv_csrs
@@ -41,25 +44,29 @@ def gen_initial_basic_block(fuzzerstate, offset_addr: int, csr_init_rounding_mod
     if DO_ASSERT:
         assert curr_addr == fuzzerstate.curr_bb_start_addr + len(fuzzerstate.instr_objs_seq[-1]) * 4 # NO_COMPRESSED
 
-    if not ("vexriscv" in fuzzerstate.design_name and is_forbid_vexriscv_csrs()):
+    if not (is_forbid_vexriscv_csrs()):
         # Write 0 to medeleg to uniformize across designs. This must be done in initialblock to facilitate the analysis.
         if fuzzerstate.design_has_supervisor_mode:
+            logger.warning(f"[initialblock:47] Creating CSR instruction: csrrw to MEDELEG")
             fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 0, CSR_IDS.MEDELEG))
             curr_addr += 4
 
         # Write 0 to mtvec and stvec to uniformize across designs. This must be done in initialblock to facilitate the analysis.
         if fuzzerstate.design_name != 'picorv32':
+            logger.warning(f"[initialblock:52] Creating CSR instruction: csrrw to MTVEC")
             fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 0, CSR_IDS.MTVEC))
             curr_addr += 4
         if fuzzerstate.design_has_supervisor_mode:
+            logger.warning(f"[initialblock:55] Creating CSR instruction: csrrw to STVEC")
             fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 0, CSR_IDS.STVEC))
             curr_addr += 4
 
     # We authorize all accesses through the PMP registers
-    if not ("vexriscv" in fuzzerstate.design_name and is_forbid_vexriscv_csrs()):
+    if not (is_forbid_vexriscv_csrs()):
         if fuzzerstate.design_has_pmp:
             # pmpcfg0
             fuzzerstate.add_instruction(RegImmInstruction("addi", 1, 0, 31, fuzzerstate.is_design_64bit))
+            logger.warning(f"[initialblock:63] Creating CSR instruction: csrrw to PMPCFG0")
             fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.PMPCFG0))
             curr_addr += 8
             # pmpaddr0
@@ -68,42 +75,57 @@ def gen_initial_basic_block(fuzzerstate, offset_addr: int, csr_init_rounding_mod
                 fuzzerstate.add_instruction(RegImmInstruction("addi", 1, 0, 1, fuzzerstate.is_design_64bit))
                 fuzzerstate.add_instruction(RegImmInstruction("slli", 1, 1, 0x36, fuzzerstate.is_design_64bit))
                 fuzzerstate.add_instruction(RegImmInstruction("addi", 1, 1, -1, fuzzerstate.is_design_64bit))
+                logger.warning(f"[initialblock:71] Creating CSR instruction: csrrw to PMPADDR0 (64-bit)")
                 fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.PMPADDR0))
                 curr_addr += 16
             else:
                 fuzzerstate.add_instruction(RegImmInstruction("addi", 1, 0, -1, fuzzerstate.is_design_64bit))
+                logger.warning(f"[initialblock:75] Creating CSR instruction: csrrw to PMPADDR0 (32-bit)")
                 fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.PMPADDR0))
                 curr_addr += 8
 
     # Write random values into the performance monitor CSRs (zeros for now)
-    if not ("vexriscv" in fuzzerstate.design_name and is_forbid_vexriscv_csrs()):
+    if not (is_forbid_vexriscv_csrs()):
         if fuzzerstate.design_name != 'picorv32':
+            logger.warning(f"[initialblock:81] Creating CSR instruction: csrrw to MCYCLE")
             fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 0, CSR_IDS.MCYCLE))
+            logger.warning(f"[initialblock:82] Creating CSR instruction: csrrw to MINSTRET")
             fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 0, CSR_IDS.MINSTRET))
+            logger.warning(f"[initialblock:83] Creating CSR instruction: csrrw to MCAUSE")
             fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 0, CSR_IDS.MCAUSE))
+            logger.warning(f"[initialblock:84] Creating CSR instruction: csrrw to MTVAL")
             fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 0, CSR_IDS.MTVAL))
+            logger.warning(f"[initialblock:85] Creating CSR instruction: csrrw to MSCRATCH")
             fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 0, CSR_IDS.MSCRATCH))
             curr_addr += 20
         if fuzzerstate.design_has_supervisor_mode:
+            logger.warning(f"[initialblock:88] Creating CSR instruction: csrrw to SCAUSE")
             fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 0, CSR_IDS.SCAUSE))
+            logger.warning(f"[initialblock:89] Creating CSR instruction: csrrw to STVAL")
             fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 0, CSR_IDS.STVAL))
+            logger.warning(f"[initialblock:90] Creating CSR instruction: csrrw to SSCRATCH")
             fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 0, CSR_IDS.SSCRATCH))
             curr_addr += 12
 
         if not fuzzerstate.is_design_64bit and fuzzerstate.design_name != 'picorv32':
+            logger.warning(f"[initialblock:94] Creating CSR instruction: csrrw to MCYCLEH")
             fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 0, CSR_IDS.MCYCLEH))
+            logger.warning(f"[initialblock:95] Creating CSR instruction: csrrw to MINSTRETH")
             fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 0, CSR_IDS.MINSTRETH))
             curr_addr += 8
 
     # Start with enabled FPU, if the FPU exists.
     if fuzzerstate.design_has_fpu:
+        print("HAS FPU")
         # FUTURE Create dependencies on FPU_ENDIS_REGISTER_ID
         # Prepare FPU_ENDIS_REGISTER_ID, which will be used across the program's execution
         fuzzerstate.add_instruction(ImmRdInstruction("lui", FPU_ENDIS_REGISTER_ID, 0b110, fuzzerstate.is_design_64bit))
         # Enable the FPU
+        logger.warning(f"[initialblock:105] Creating CSR instruction: csrrw to MSTATUS (FPU enable)")
         fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS))
         # Set the initial rounding mode to zero initially, arbitrarily. We arbitrarily use the register x1 as an intermediate register
         fuzzerstate.add_instruction(RegImmInstruction("addi", 1, 0, 0, fuzzerstate.is_design_64bit))
+        logger.warning(f"[initialblock:108] Creating CSR instruction: csrrw to FCSR")
         fuzzerstate.add_instruction(CSRRegInstruction("csrrw", 0, 1, CSR_IDS.FCSR))
         curr_addr += 16 # NO_COMPRESSED
 
@@ -111,6 +133,7 @@ def gen_initial_basic_block(fuzzerstate, offset_addr: int, csr_init_rounding_mod
     curr_addr += 4 # NO_COMPRESSED
 
     if fuzzerstate.design_has_supervisor_mode or fuzzerstate.design_has_user_mode:
+        print("HAS MODE")
         fuzzerstate.add_instruction(RegImmInstruction("srli", MPP_TOP_ENDIS_REGISTER_ID, 1, 1, fuzzerstate.is_design_64bit))
         fuzzerstate.add_instruction(RegImmInstruction("srli", MPP_BOTH_ENDIS_REGISTER_ID, 1, 2, fuzzerstate.is_design_64bit))
         fuzzerstate.add_instruction(R12DInstruction("or", MPP_BOTH_ENDIS_REGISTER_ID, MPP_BOTH_ENDIS_REGISTER_ID, MPP_TOP_ENDIS_REGISTER_ID))
@@ -118,7 +141,9 @@ def gen_initial_basic_block(fuzzerstate, offset_addr: int, csr_init_rounding_mod
         fuzzerstate.add_instruction(RegImmInstruction("addi", 0, 0, 0, fuzzerstate.is_design_64bit))
         curr_addr += 16 # NO_COMPRESSED
         # While it is not necesary to set the mpp initially, it is convenient to do so. If we don't, then we should adapt the initial values (typically to None) in privilegestate.py
+        logger.warning(f"[initialblock:123] Creating CSR instruction: csrrs to MSTATUS (MPP_BOTH)")
         fuzzerstate.add_instruction(CSRRegInstruction("csrrs", 0, MPP_BOTH_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS))
+        logger.warning(f"[initialblock:124] Creating CSR instruction: csrrs to MSTATUS (MPP_TOP)")
         fuzzerstate.add_instruction(CSRRegInstruction("csrrs", 0, MPP_TOP_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS))
         curr_addr += 8 # NO_COMPRESSED
 
@@ -127,6 +152,7 @@ def gen_initial_basic_block(fuzzerstate, offset_addr: int, csr_init_rounding_mod
             fuzzerstate.add_instruction(RegImmInstruction("srli", SPP_ENDIS_REGISTER_ID, 1, 5, fuzzerstate.is_design_64bit))
             curr_addr += 4 # NO_COMPRESSED
             # While it is not necesary to set the mpp initially, it is convenient to do so. If we don't, then we should adapt the initial values (typically to None) in privilegestate.py
+            logger.warning(f"[initialblock:132] Creating CSR instruction: csrrs to MSTATUS (SPP)")
             fuzzerstate.add_instruction(CSRRegInstruction("csrrs", 0, SPP_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS))
             curr_addr += 4 # NO_COMPRESSED
 

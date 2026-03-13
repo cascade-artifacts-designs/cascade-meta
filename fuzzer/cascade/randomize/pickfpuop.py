@@ -4,6 +4,9 @@
 
 # This module is responsible for picking floating-point operations
 
+import logging
+logger = logging.getLogger(__name__)
+
 from params.runparams import DO_ASSERT
 from rv.csrids import CSR_IDS
 from params.fuzzparams import FPU_ENDIS_REGISTER_ID
@@ -30,12 +33,14 @@ def create_rmswitch_instrobjs(fuzzerstate):
     # Either through the frm CSR, or through the fcsr register
     use_frm_csr = random.randint(0, 1)
     if use_frm_csr:
+        logger.warning(f"[pickfpuop:36] Creating CSR instruction: csrrw to FRM (rounding mode)")
         return [
             # Put the rounding mode to rinterm, and unset the flag bits
             RegImmInstruction("addi", rinterm, 0, new_rm, fuzzerstate.is_design_64bit),
             CSRRegInstruction("csrrw", rd, rinterm, CSR_IDS.FRM)
         ]
     else:
+        logger.warning(f"[pickfpuop:42] Creating CSR instruction: csrrw to FCSR (rounding mode)")
         return [
             # Put the rounding mode to rinterm, and unset the flag bits
             RegImmInstruction("addi", rinterm, 0, new_rm << 5, fuzzerstate.is_design_64bit),
@@ -53,8 +58,10 @@ def gen_fpufsm_instrs(fuzzerstate):
     if random.random() < fuzzerstate.proba_turn_on_off_fpu_again:
         rd = 0 # FUTURE WARL
         if fuzzerstate.is_fpu_activated:
+            logger.warning(f"[pickfpuop:56] Creating CSR instruction: csrrs to MSTATUS (FPU turn on again)")
             ret = [CSRRegInstruction("csrrs", rd, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
         else:
+            logger.warning(f"[pickfpuop:58] Creating CSR instruction: csrrc to MSTATUS (FPU turn off again)")
             ret = [CSRRegInstruction("csrrc", rd, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
 
     # If the FPU is off, then we turn the FPU on.
@@ -66,10 +73,12 @@ def gen_fpufsm_instrs(fuzzerstate):
         else:
             fuzzerstate.is_fpu_activated = False
             rd = 0 # Do not read the value because for triaging we want to be ablw to remove these instructions
+            logger.warning(f"[pickfpuop:69] Creating CSR instruction: csrrc to MSTATUS (FPU disable)")
             ret = [CSRRegInstruction("csrrc", rd, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
     else:
         rd = 0 # WARL
         fuzzerstate.is_fpu_activated = True
+        logger.warning(f"[pickfpuop:73] Creating CSR instruction: csrrs to MSTATUS (FPU enable)")
         ret = [CSRRegInstruction("csrrs", rd, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS)]
     
     if len(ret) == 1: # Equivalent to FPU enable/disable

@@ -46,6 +46,14 @@ def instruc_rtype(opcode: int, rd: int, funct3: int, rs1: int, rs2: int, funct7:
 # @param funct3: uint8_t
 # @param rs1: uint8_t
 def instruc_itype(opcode: int, rd: int, funct3: int, rs1: int, imm: int):
+    # Check if this is creating a CSR instruction
+    if opcode == 0x73 and funct3 in [0b001, 0b010, 0b011, 0b101, 0b110, 0b111]:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.warning(f"rvprotoinstrs.py:instruc_itype: Creating CSR instruction! opcode=0x{opcode:x}, funct3=0b{funct3:03b}, csr=0x{imm:x}")
+        logger.warning(f"Stack trace:\n{''.join(traceback.format_stack())}")
+    
     if DO_ASSERT:
         assert(opcode < (1 << 7))
         assert(rd < 32)

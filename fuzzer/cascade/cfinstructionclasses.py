@@ -1043,7 +1043,7 @@ class RawDataWord:
                 self.wordval = wordval + (1 << 32)
 
     def gen_bytecode_int(self, is_spike_resolution: bool):
-        return self.wordval
+       return self.wordval
 
 ###
 # For exceptions
