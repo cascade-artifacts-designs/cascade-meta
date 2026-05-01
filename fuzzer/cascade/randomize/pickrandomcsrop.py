@@ -4,7 +4,7 @@
 
 # This module picks some random valid CSR operation.
 
-from params.runparams import DO_ASSERT
+from params.runparams import DO_ASSERT, USE_COMPRESSED
 from rv.csrids import CSR_IDS
 from cascade.toleratebugs import is_no_interaction_minstret, is_tolerate_kronos_minstret, is_tolerate_vexriscv_minstret, is_tolerate_picorv32_missingmandatorycsrs, is_tolerate_picorv32_readnonimplcsr, is_tolerate_picorv32_writehpm, is_tolerate_cva6_mhpmcounter, is_tolerate_boom_minstret, is_tolerate_picorv32_readhpm_nocsrrs, is_tolerate_vexriscv_mhpmcountern, is_tolerate_cva6_mhpmevent31
 from cascade.privilegestate import PrivilegeStateEnum
@@ -60,10 +60,18 @@ def gen_random_csr_op(fuzzerstate):
             elif target_csr == MachineCSROpCandidates64.MSCRATCH:
                     ret = CSRRegInstruction("csrrw", fuzzerstate.intregpickstate.pick_int_outputreg(), fuzzerstate.intregpickstate.pick_int_inputreg(), CSR_IDS.MSCRATCH)
             elif target_csr == MachineCSROpCandidates64.MINSTRET:
-                if fuzzerstate.is_minstret_inaccurate_because_ecall_ebreak or ("boom" in fuzzerstate.design_name and not is_tolerate_boom_minstret()):
+                # When USE_COMPRESSED is active on a design that supports the C
+                # extension, the rtl-spike check executes one extra c.nop per
+                # compressed slot, so MINSTRET diverges between SR and RTL by
+                # exactly that count. Sinking the read into x0 prevents the
+                # divergent value from polluting the producer/consumer chain.
+                use_compressed_minstret = USE_COMPRESSED and getattr(
+                    fuzzerstate, 'design_has_compressed_support', False)
+                if (fuzzerstate.is_minstret_inaccurate_because_ecall_ebreak
+                    or ("boom" in fuzzerstate.design_name and not is_tolerate_boom_minstret())
+                    or use_compressed_minstret):
                     ret = CSRImmInstruction("csrrwi", 0, random.randrange(16), CSR_IDS.MINSTRET)
                 else:
-                    
                     ret = CSRRegInstruction("csrrw", fuzzerstate.intregpickstate.pick_int_outputreg(), fuzzerstate.intregpickstate.pick_int_inputreg(), CSR_IDS.MINSTRET)
                 fuzzerstate.is_minstret_inaccurate_because_ecall_ebreak = False
             elif target_csr == MachineCSROpCandidates64.MHPMCOUNTER3:
@@ -99,7 +107,12 @@ def gen_random_csr_op(fuzzerstate):
             elif target_csr == MachineCSROpCandidates32.MSCRATCH:
                 ret = CSRRegInstruction("csrrw", fuzzerstate.intregpickstate.pick_int_outputreg(), fuzzerstate.intregpickstate.pick_int_inputreg(), CSR_IDS.MSCRATCH)
             elif target_csr == MachineCSROpCandidates32.MINSTRET:
-                if "kronos" in fuzzerstate.design_name and not is_tolerate_kronos_minstret() or "vexriscv" in fuzzerstate.design_name and not is_tolerate_vexriscv_minstret():
+                # See the rv64 branch above for the use_compressed_minstret rationale.
+                use_compressed_minstret = USE_COMPRESSED and getattr(
+                    fuzzerstate, 'design_has_compressed_support', False)
+                if use_compressed_minstret:
+                    ret = CSRImmInstruction("csrrwi", 0, random.randrange(16), CSR_IDS.MINSTRET)
+                elif "kronos" in fuzzerstate.design_name and not is_tolerate_kronos_minstret() or "vexriscv" in fuzzerstate.design_name and not is_tolerate_vexriscv_minstret():
                     ret = CSRRegInstruction("csrrw", 0, fuzzerstate.intregpickstate.pick_int_inputreg(), CSR_IDS.MINSTRET)
                 elif "picorv32" in fuzzerstate.design_name:
                     if is_tolerate_picorv32_readhpm_nocsrrs():

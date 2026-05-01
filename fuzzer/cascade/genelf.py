@@ -11,6 +11,19 @@ from cascade.finalblock import finalblock_spike_resolution
 from collections import defaultdict
 import os
 
+
+# Emit the bytecode for a single instruction in a 4-byte slot.
+def _emit_slot_bytecode(instr_obj, is_spike_resolution: bool) -> bytes:
+    iscompressed = instr_obj.iscompressed if hasattr(instr_obj, 'iscompressed') else False
+    if iscompressed and not is_spike_resolution:
+        from rv.rvc import try_pack_compressed_with_nop
+        packed = try_pack_compressed_with_nop(instr_obj)
+        if packed is not None:
+            return packed.to_bytes(4, 'little')
+        instr_obj.iscompressed = False
+    return instr_obj.gen_bytecode_int(is_spike_resolution=is_spike_resolution).to_bytes(4, 'little')
+
+
 # From a fuzzerstate, generates an ELF, may it be for spike resolution or for RTL simulation
 # Also integrates the final block.
 # @param instr_objs an iterable (one per basic block) of iterables of CFInstructions or placeholders
@@ -24,7 +37,7 @@ def gen_elf_from_bbs(fuzzerstate, is_spike_resolution, prefixname: str, test_ide
     addr_instrs = defaultdict(bytes) # addr_instrs[addr] = single byte
     for bb_start_addr, bb_instrs in zip(fuzzerstate.bb_start_addr_seq, fuzzerstate.instr_objs_seq):
         for instr_id_in_bb, instr_obj in enumerate(bb_instrs):
-            curr_bytecode = instr_obj.gen_bytecode_int(is_spike_resolution=is_spike_resolution).to_bytes(4, 'little')
+            curr_bytecode = _emit_slot_bytecode(instr_obj, is_spike_resolution)
             for curr_byte_id, curr_byte in enumerate(curr_bytecode):
                 curr_addr = bb_start_addr + 4*instr_id_in_bb + curr_byte_id # NO_COMPRESSED
                 if DO_ASSERT:
@@ -34,7 +47,7 @@ def gen_elf_from_bbs(fuzzerstate, is_spike_resolution, prefixname: str, test_ide
     for instr_id_in_bb, instr_obj in enumerate(fuzzerstate.ctxsv_bb):
         if instr_obj is None:
             raise ValueError(f"instrobj is None for ctxsv_bb at index {instr_id_in_bb}")
-        curr_bytecode = instr_obj.gen_bytecode_int(is_spike_resolution=is_spike_resolution).to_bytes(4, 'little')
+        curr_bytecode = _emit_slot_bytecode(instr_obj, is_spike_resolution)
         for curr_byte_id, curr_byte in enumerate(curr_bytecode):
             curr_addr = fuzzerstate.ctxsv_bb_base_addr + 4*instr_id_in_bb + curr_byte_id # NO_COMPRESSED
             if DO_ASSERT:
@@ -56,7 +69,7 @@ def gen_elf_from_bbs(fuzzerstate, is_spike_resolution, prefixname: str, test_ide
     else:
         final_block = fuzzerstate.final_bb
     for instr_id_in_bb, instr_obj in enumerate(final_block):
-        curr_bytecode = instr_obj.gen_bytecode_int(is_spike_resolution=is_spike_resolution).to_bytes(4, 'little')
+        curr_bytecode = _emit_slot_bytecode(instr_obj, is_spike_resolution)
         for curr_byte_id, curr_byte in enumerate(curr_bytecode):
             curr_addr = fuzzerstate.final_bb_base_addr + 4*instr_id_in_bb + curr_byte_id # NO_COMPRESSED
             if DO_ASSERT:

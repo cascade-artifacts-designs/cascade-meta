@@ -41,7 +41,7 @@ class CFInstruction:
     def __init__(self, instr_str: str, iscompressed: bool = False):
         self.instr_str = instr_str
         self.iscompressed = iscompressed
-        assert not iscompressed, "Compressed instructions are not yet supported."
+
         self.assert_authorized_instr_strs()
 
     # @param is_spike_resolution: some rare instructions (typically offset management placeholders) are treated differently between spike resolution and the subsequent actual simulation.

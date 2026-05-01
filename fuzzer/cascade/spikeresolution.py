@@ -2,9 +2,18 @@
 # Licensed under the General Public License, Version 3.0, see LICENSE for details.
 # SPDX-License-Identifier: GPL-3.0-only
 
-from params.runparams import DO_ASSERT, NO_REMOVE_TMPFILES
-from common.designcfgs import get_design_march_flags_nocompressed
+from params.runparams import DO_ASSERT, NO_REMOVE_TMPFILES, USE_COMPRESSED
+from common.designcfgs import get_design_march_flags, get_design_march_flags_nocompressed
 from common.spike import run_trace_all_pcs, run_trace_regs_at_pc_locs, SPIKE_STARTADDR, FPREG_ABINAMES
+
+
+def _spike_isa_for_rtl_check(design_name: str) -> str:
+    """ISA flag used when running spike against the RTL ELF. The RTL ELF
+    contains compressed pairs whenever the design supports the C extension and
+    USE_COMPRESSED is enabled, so spike must decode RVC."""
+    if USE_COMPRESSED and 'c' in get_design_march_flags(design_name):
+        return get_design_march_flags(design_name)
+    return get_design_march_flags_nocompressed(design_name)
 
 from cascade.cfinstructionclasses import PlaceholderConsumerInstr, BranchInstruction, PlaceholderProducerInstr0, PlaceholderProducerInstr1, JALRInstruction, PlaceholderPreConsumerInstr, IntStoreInstruction, FloatStoreInstruction
 from cascade.genelf import gen_elf_from_bbs
@@ -210,23 +219,44 @@ def _transmit_addrs_to_producers_for_spike_resolution(fuzzerstate):
 
 # Check that the PC trace from spike matches with the expected PC trace
 def _check_pc_trace_from_spike(fuzzerstate, spike_pc_seq):
-    # Check that the PC sequence corresponds to the expected addresses
+    # When iscompressed is set and the slot's compressed instruction does NOT
+    # transfer control (anything but a taken c.j / c.jal / c.jr / c.jalr /
+    # taken c.beqz / taken c.bnez), spike additionally steps the c.nop pad at
+    # slot+2. We consume that extra PC entry here.
+    from cascade.cfinstructionclasses import (
+        BranchInstruction, JALInstruction, JALRInstruction,
+    )
+
+    def _slot_has_cnop_step(instr):
+        if not getattr(instr, 'iscompressed', False):
+            return False
+        if isinstance(instr, JALInstruction) or isinstance(instr, JALRInstruction):
+            return False
+        if isinstance(instr, BranchInstruction) and getattr(instr, 'plan_taken', False):
+            return False
+        return True
+
     curr_id_in_spike_pc_seq = 0
     prev_pc = -1
-    id_in_spike_pc_seq = 0
     for bb_id, bb_instrlist in enumerate(fuzzerstate.instr_objs_seq):
         for bb_instr_id, bb_instr in enumerate(bb_instrlist):
             spike_pc = spike_pc_seq[curr_id_in_spike_pc_seq]
             curr_id_in_spike_pc_seq += 1
-            expected_pc = SPIKE_STARTADDR + fuzzerstate.bb_start_addr_seq[bb_id] + 4*bb_instr_id # NO_COMPRESSED
+            expected_pc = SPIKE_STARTADDR + fuzzerstate.bb_start_addr_seq[bb_id] + 4*bb_instr_id
 
             if spike_pc != expected_pc:
                 raise ValueError(f"PC mismatch: spike said `{hex(spike_pc)}`, but we expected `{hex(expected_pc)}`. BB id: `{hex(bb_id)}`, instr id: `{hex(bb_instr_id)}`. Prev pc: `{hex(prev_pc)}`. Spike instr id: {curr_id_in_spike_pc_seq}. Fuzzerstate identification: {fuzzerstate.instance_to_str()}")
             prev_pc = expected_pc
-            id_in_spike_pc_seq += 1
+
+            if _slot_has_cnop_step(bb_instr):
+                expected_cnop_pc = expected_pc + 2
+                cnop_spike_pc = spike_pc_seq[curr_id_in_spike_pc_seq]
+                if cnop_spike_pc != expected_cnop_pc:
+                    raise ValueError(f"c.nop pad PC mismatch at compressed slot: spike said `{hex(cnop_spike_pc)}`, expected `{hex(expected_cnop_pc)}` at bb {bb_id} instr {bb_instr_id}.")
+                curr_id_in_spike_pc_seq += 1
 
     # Check that the final bb is reached
-    assert(spike_pc_seq[id_in_spike_pc_seq] == SPIKE_STARTADDR + fuzzerstate.final_bb_base_addr), f"spike_pc_seq[id_in_spike_pc_seq]: `{hex(spike_pc_seq[id_in_spike_pc_seq])}`, fuzzerstate.final_bb_base_addr: {hex(SPIKE_STARTADDR + fuzzerstate.final_bb_base_addr)}"
+    assert(spike_pc_seq[curr_id_in_spike_pc_seq] == SPIKE_STARTADDR + fuzzerstate.final_bb_base_addr), f"spike_pc_seq[curr_id_in_spike_pc_seq]: `{hex(spike_pc_seq[curr_id_in_spike_pc_seq])}`, fuzzerstate.final_bb_base_addr: {hex(SPIKE_STARTADDR + fuzzerstate.final_bb_base_addr)}"
 
 
 # Takes a fuzzerstate after its basic blocks were generated.
@@ -258,7 +288,20 @@ def spike_resolution(fuzzerstate, check_pc_spike_again: bool = False):
         rtl_spike_elfpath = gen_elf_from_bbs(fuzzerstate, False, 'spikedoublecheck', fuzzerstate.instance_to_str(), SPIKE_STARTADDR)
         if NO_REMOVE_TMPFILES:
             print('rtl_spike_elfpath:', rtl_spike_elfpath)
-        rtl_spike_pc_seq, (finalintregvals_spikecheck, finalfpuregvals_spikecheck) = run_trace_all_pcs(fuzzerstate.instance_to_str(), rtl_spike_elfpath, get_design_march_flags_nocompressed(design_name), len(flat_instr_objs)+1, SPIKE_STARTADDR, True,  fuzzerstate.num_pickable_floating_regs if fuzzerstate.design_has_fpu else 0, fuzzerstate.design_has_fpud, fuzzerstate)
+        # When the RTL ELF contains compressed pairs (c.<op> | c.nop), each
+        # such slot adds one extra spike step (the c.nop pad) unless the
+        # compressed instruction transferred control.
+        from cascade.cfinstructionclasses import BranchInstruction, JALInstruction, JALRInstruction
+        n_extra_cnop_steps = 0
+        for instr in flat_instr_objs:
+            if not getattr(instr, 'iscompressed', False):
+                continue
+            if isinstance(instr, (JALInstruction, JALRInstruction)):
+                continue
+            if isinstance(instr, BranchInstruction) and getattr(instr, 'plan_taken', False):
+                continue
+            n_extra_cnop_steps += 1
+        rtl_spike_pc_seq, (finalintregvals_spikecheck, finalfpuregvals_spikecheck) = run_trace_all_pcs(fuzzerstate.instance_to_str(), rtl_spike_elfpath, _spike_isa_for_rtl_check(design_name), len(flat_instr_objs)+n_extra_cnop_steps+1, SPIKE_STARTADDR, True,  fuzzerstate.num_pickable_floating_regs if fuzzerstate.design_has_fpu else 0, fuzzerstate.design_has_fpud, fuzzerstate)
         if not NO_REMOVE_TMPFILES:
             os.remove(rtl_spike_elfpath)
             del rtl_spike_elfpath

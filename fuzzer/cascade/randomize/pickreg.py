@@ -12,11 +12,19 @@ import math
 import numpy as np
 import random
 
+_RVC_PRIME_REGS = frozenset(range(8, 16))  # x8..x15 are addressable in 3-bit RVC fields
+_RVC_PREFERRED_REGS = _RVC_PRIME_REGS | {2}  # plus x2 (sp) for *sp accesses
+
 class IntRegPickState:
     # no_dependency_bias: only to evaluate the impact of the dependency bias
     def __init__(self, num_pickable_regs: int, no_dependency_bias: bool):
         self.num_pickable_regs = num_pickable_regs
         self.nodependencybias = no_dependency_bias
+        # When >0, picks bias toward RVC-addressable registers so opportunistic
+        # compression actually fires often enough to stress the C decoder.
+        # 0   -> no bias (legacy behaviour)
+        # f>0 -> multiply weights of {x2, x8..x15} by (1 + f) before sampling
+        self.rvc_bias = 0.0
         self.__reg_weights  = np.ones(self.num_pickable_regs)
         self.__reg_weights /= np.sum(self.__reg_weights)
         self.__reg_states   = [IntRegIndivState.FREE for _ in range(self.num_pickable_regs)]
@@ -45,8 +53,16 @@ class IntRegPickState:
         if DO_ASSERT:
             assert np.any(authorized_regs_onehot)
         if self.nodependencybias:
-            return authorized_regs_onehot
-        return self.__reg_weights * authorized_regs_onehot
+            base = authorized_regs_onehot
+        else:
+            base = self.__reg_weights * authorized_regs_onehot
+        if self.rvc_bias:
+            mult = np.ones(self.num_pickable_regs)
+            for r in _RVC_PREFERRED_REGS:
+                if r < self.num_pickable_regs:
+                    mult[r] = 1.0 + self.rvc_bias
+            base = base * mult
+        return base
     # Returns a free inputreg.
     def pick_int_inputreg(self, authorize_sideeffects: bool = True):
         return random.choices(range(self.num_pickable_regs), self.get_effective_weights(self.get_free_regs_onehot()))[0]
