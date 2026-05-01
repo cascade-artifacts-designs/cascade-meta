@@ -10,7 +10,7 @@ CARGOEXEC=$(CARGO_HOME)/bin/cargo
 
 LOGFILES=log
 
-installtools: install_verilator install_morty install_rust install_bender install_fusesoc install_sv2v install_cascade_python install_yosys install_miniconda install_toolchain install_spike install_makeelf
+installtools: install_verilator install_morty install_rust install_bender install_fusesoc install_sv2v install_cascade_python install_yosys install_miniconda install_toolchain install_spike
 
 install_verilator: | log
 	( unset VERILATOR_ROOT && cd verilator && autoconf && ./configure --prefix=$(PREFIX_CASCADE) && make -j$(CASCADE_JOBS) && make install ) >$(LOGFILES)/verilator.log 2>&1
@@ -68,9 +68,6 @@ install_toolchain: $(PREFIX_CASCADE)/riscv | log
 
 install_spike: $(PREFIX_CASCADE)/riscv | log
 	(cd riscv-isa-sim && mkdir -p build && cd build && ../configure --prefix=$(PREFIX_CASCADE)/riscv && make -j $(CASCADE_JOBS) && make install) >$(LOGFILES)/spike.log 2>&1
-
-install_makeelf: | log
-	(cd makeelf && git checkout finercontrol && $(PYTHON) setup.py install) >$(LOGFILES)/makeelf.log 2>&1
 
 $(CASCADE_PYTHON_VENV): | log
 	$(PYTHON) -mvenv $(CASCADE_PYTHON_VENV)

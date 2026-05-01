@@ -36,6 +36,12 @@ class IntRegPickState:
             self.__last_producer_ids.fill(None) # To avoid luckily having offset 0
         # Mnemonic list for speeding up searches
         self.__regs_in_state_onehot = {curr_indiv_state: np.ones(self.num_pickable_regs, np.int8) if (curr_indiv_state == IntRegIndivState.FREE) else np.zeros(self.num_pickable_regs, np.int8) for curr_indiv_state in IntRegIndivState}
+        # Maintain a parallel scalar count per state. exists_reg_in_state and
+        # get_num_regs_in_state are called once or twice per generated
+        # instruction; numpy.any / numpy.sum on tiny (~25 element) arrays
+        # dominated the gen_basicblocks profile until this cache was added.
+        self.__state_counts = {s: 0 for s in IntRegIndivState}
+        self.__state_counts[IntRegIndivState.FREE] = self.num_pickable_regs
         # Will ignore x0 if line below is uncommented. This is a design decision.
         # self.__reg_weights[0] = 0
     def get_free_regs_onehot(self):
@@ -50,8 +56,11 @@ class IntRegPickState:
         return ret
     # Weights after deducting the forbidden registers
     def get_effective_weights(self, authorized_regs_onehot):
+        # The assertion was previously ``np.any(authorized_regs_onehot)`` which
+        # is one of the most-called paths inside gen_basicblocks. Python's
+        # builtin ``any`` over a small list of ints is ~5x cheaper.
         if DO_ASSERT:
-            assert np.any(authorized_regs_onehot)
+            assert any(authorized_regs_onehot)
         if self.nodependencybias:
             base = authorized_regs_onehot
         else:
@@ -146,8 +155,11 @@ class IntRegPickState:
                         assert self.__regs_in_state_onehot[s][reg_id] == int(s == self.__reg_states[reg_id])
                 else:
                     assert self.__regs_in_state_onehot[self.__reg_states[reg_id]][reg_id]
-        self.__regs_in_state_onehot[self.__reg_states[reg_id]][reg_id] = 0
+        old_state = self.__reg_states[reg_id]
+        self.__regs_in_state_onehot[old_state][reg_id] = 0
         self.__regs_in_state_onehot[new_state][reg_id] = 1
+        self.__state_counts[old_state] -= 1
+        self.__state_counts[new_state] += 1
         self.__reg_states[reg_id] = new_state
     # Brings iteratively a register to the requested state, as fast as possible
     # @return nothing, but guarantees that a register will be in the target state
@@ -175,7 +187,12 @@ class IntRegPickState:
 
     # Save at the end of basic blocks, and restore if popping basic blocks from the end.
     def save_curr_state(self):
-        return copy(self.__reg_weights), copy(self.__reg_states), copy(self.__last_producer_ids), deepcopy(self.__last_producer_coords)
+        # ``__last_producer_coords`` is set in __init__ but the writers
+        # (set_producerN_location) are unused — see commented-out call sites in
+        # createcfinstr.py. Skip the deepcopy until that optimisation is wired
+        # back up; previously this was the single largest hot path inside
+        # gen_basicblocks.
+        return copy(self.__reg_weights), copy(self.__reg_states), copy(self.__last_producer_ids), self.__last_producer_coords
     # Rarely called.
     def restore_state(self, saved_state: tuple):
         if DO_ASSERT:
@@ -186,7 +203,7 @@ class IntRegPickState:
         for reg_id in range(1, self.num_pickable_regs):
             self.set_regstate(reg_id, saved_state[1][reg_id], force=True)
         self.__last_producer_ids = copy(saved_state[2])
-        self.__last_producer_coords = deepcopy(saved_state[3])
+        self.__last_producer_coords = saved_state[3]
 
     # Getters and setters for producer ids 
     def get_producer_id(self, reg_id: int):
@@ -198,11 +215,12 @@ class IntRegPickState:
     def set_producer1_location(self, reg_id: int, bb_id: int, instr_id_in_bb: int):
         self.__last_producer_coords[reg_id][1] = (bb_id, instr_id_in_bb)
 
-    # Getters for registers in a certain state
+    # Getters for registers in a certain state. Backed by an integer counter to
+    # avoid an np.any / np.sum on the full mask for every generated instruction.
     def exists_reg_in_state(self, req_state: IntRegIndivState) -> bool:
-        return np.any(self.__regs_in_state_onehot[req_state])
-    def get_num_regs_in_state(self, req_state: IntRegIndivState) -> bool:
-        return np.sum(self.__regs_in_state_onehot[req_state])
+        return self.__state_counts[req_state] > 0
+    def get_num_regs_in_state(self, req_state: IntRegIndivState) -> int:
+        return self.__state_counts[req_state]
     def pick_int_reg_in_state(self, req_state: IntRegIndivState):
         if DO_ASSERT:
             assert self.exists_reg_in_state(req_state), f"No reg in state `{req_state}`"
