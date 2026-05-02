@@ -16,7 +16,7 @@ from cascade.randomize.pickfpuop import gen_fpufsm_instrs
 from cascade.randomize.pickexceptionop import gen_exception_instr, gen_tvecfill_instr, gen_epcfill_instr, gen_medeleg_instr, gen_ppfill_instrs
 from cascade.randomize.pickrandomcsrop import gen_random_csr_op
 from cascade.randomize.pickprivilegedescentop import gen_priv_descent_instr
-from cascade.cfinstructionclasses import is_placeholder, JALInstruction, JALRInstruction, BranchInstruction, ExceptionInstruction, TvecWriterInstruction, EPCWriterInstruction, GenericCSRWriterInstruction, MisalignedMemInstruction, PrivilegeDescentInstruction, EcallEbreakInstruction, SimpleExceptionEncapsulator, CSRRegInstruction
+from cascade.cfinstructionclasses import is_placeholder, JALInstruction, JALRInstruction, BranchInstruction, ExceptionInstruction, TvecWriterInstruction, EPCWriterInstruction, GenericCSRWriterInstruction, MisalignedMemInstruction, PrivilegeDescentInstruction, EcallEbreakInstruction, SimpleExceptionEncapsulator, CSRRegInstruction, PlaceholderConsumerInstr, RegImmInstruction
 from cascade.util import get_range_bits_per_instrclass, IntRegIndivState, BASIC_BLOCK_MIN_SPACE, INSTRUCTIONS_BY_ISA_CLASS
 from cascade.finalblock import get_finalblock_max_size,finalblock
 from cascade.initialblock import gen_initial_basic_block
@@ -116,11 +116,20 @@ def gen_basicblock(fuzzerstate):
     fuzzerstate.init_new_bb() # Update fuzzer state to support a new basic block
 
     # This points to the first address after the current basic block allocation.
-    #  The block allocation takes 16 bytes in advance, to avoid storing and then 
+    #  The block allocation takes 16 bytes in advance, to avoid storing and then
     # not being able to continue expanding the basic block.
     curr_alloc_cursor = fuzzerstate.curr_bb_start_addr + BASIC_BLOCK_MIN_SPACE
     curr_isa_class = None # This is used in case there is only space for control flow
     fuzzerstate.curr_branch_taken = None
+    # rd of the last placeholder consumer just appended to this BB, or None.
+    # JALR/Load/Store pick rs1 from CONSUMED — so the next address-using
+    # instruction nearly always reads the freshly-written rd back-to-back,
+    # and Spike's debug-mode resolution on upstream cva6 falls over on that
+    # chain. We break it with two nop bubbles only when the chain actually
+    # materialises, leaving program length and pipeline pressure untouched
+    # on the (vast majority of) sites where the consumer is followed by
+    # something else.
+    last_consumer_rd = None
 
     # We stop the instruction generation either when there is no more space 
     # available, or when we encounter an end-of-state instruction
@@ -202,6 +211,22 @@ def gen_basicblock(fuzzerstate):
                 instr_str = gen_next_instrstr_from_isaclass(curr_isa_class, fuzzerstate)
                 new_instrobjs = [create_instr(instr_str, fuzzerstate, curr_addr)]
 
+        # If the previous emitted instruction was a placeholder consumer and
+        # the very next instruction picks that same register as rs1, prepend
+        # two addi-x0 bubbles to break the back-to-back chain. See the
+        # last_consumer_rd comment at the top of this function.
+        if last_consumer_rd is not None and getattr(new_instrobjs[0], 'rs1', -1) == last_consumer_rd:
+            new_instrobjs = [
+                RegImmInstruction("addi", 0, 0, 0, fuzzerstate.is_design_64bit),
+                RegImmInstruction("addi", 0, 0, 0, fuzzerstate.is_design_64bit),
+                *new_instrobjs,
+            ]
+        last_consumer_rd = (
+            new_instrobjs[-1].rd
+            if isinstance(new_instrobjs[-1], PlaceholderConsumerInstr)
+            else None
+        )
+
         # Update the program view
         fuzzerstate.add_instruction(new_instrobjs)
 
@@ -219,7 +244,10 @@ def gen_basicblock(fuzzerstate):
     # This is reached if we need to urgently jump to the next basic block.
     # The algorithm is the following: if there is a possibility to jump immediately, 
     # then do so. Else, prepare the registers as fast as possible.
-    curr_isa_class = random.choices([ISAInstrClass.JAL, ISAInstrClass.JALR, ISAInstrClass.BRANCH], [1, 1, 1], k=1)[0]
+    # The emergency tail path only has the pre-reserved tail space available.
+    # JALR may need extra producer/consumer materialization and can overflow that
+    # reservation, so keep the fallback to single-slot control transfers here.
+    curr_isa_class = random.choices([ISAInstrClass.JAL, ISAInstrClass.BRANCH], [1, 1], k=1)[0]
     curr_addr = fuzzerstate.get_current_addr()
 
     # No need for any preparation if jal, because it has no true dependency
@@ -237,20 +265,6 @@ def gen_basicblock(fuzzerstate):
         else:
             raise ValueError(f"Unexpected isa class `{curr_isa_class}`")
 
-    else:
-        # For JALR, bring some reg to maturity, and then insert the control flow instruction
-        if DO_ASSERT:
-            assert curr_isa_class == ISAInstrClass.JALR
-
-        fuzzerstate.intregpickstate.bring_some_reg_to_state(IntRegIndivState.CONSUMED, fuzzerstate)
-        curr_addr = fuzzerstate.get_current_addr() # NO_COMPRESSED
-
-        # Gen the next bb addr
-        is_block_terminated = gen_next_bb_addr(fuzzerstate, curr_isa_class, curr_addr, curr_alloc_cursor, False)
-        if is_block_terminated == False:
-            return False
-        else:
-            fuzzerstate.add_instruction(create_instr('jalr', fuzzerstate, curr_addr))
     return True
 
 # @brief This function generates the producer_id_to_tgtaddr dictionary and the 
