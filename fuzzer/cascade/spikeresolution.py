@@ -7,10 +7,14 @@ from common.designcfgs import get_design_march_flags, get_design_march_flags_noc
 from common.spike import run_trace_all_pcs, run_trace_regs_at_pc_locs, SPIKE_STARTADDR, FPREG_ABINAMES
 
 
-def _spike_isa_for_rtl_check(design_name: str) -> str:
-    """ISA flag used when running spike against the RTL ELF. The RTL ELF
-    contains compressed pairs whenever the design supports the C extension and
-    USE_COMPRESSED is enabled, so spike must decode RVC."""
+def spike_isa_for_rtl_elf(design_name: str) -> str:
+    """ISA flag used when running spike against an ELF that was built for
+    RTL (i.e. ``gen_elf_from_bbs(..., is_spike_resolution=False, ...)``).
+    Such ELFs contain packed compressed pairs whenever the design supports
+    the C extension and USE_COMPRESSED is enabled, so spike must decode RVC
+    or it traps on the first compressed slot. ELFs built for the main
+    spike-resolution call (``is_spike_resolution=True``) are always
+    uncompressed and should keep using ``get_design_march_flags_nocompressed``."""
     if USE_COMPRESSED and 'c' in get_design_march_flags(design_name):
         return get_design_march_flags(design_name)
     return get_design_march_flags_nocompressed(design_name)
@@ -301,7 +305,7 @@ def spike_resolution(fuzzerstate, check_pc_spike_again: bool = False):
             if isinstance(instr, BranchInstruction) and getattr(instr, 'plan_taken', False):
                 continue
             n_extra_cnop_steps += 1
-        rtl_spike_pc_seq, (finalintregvals_spikecheck, finalfpuregvals_spikecheck) = run_trace_all_pcs(fuzzerstate.instance_to_str(), rtl_spike_elfpath, _spike_isa_for_rtl_check(design_name), len(flat_instr_objs)+n_extra_cnop_steps+1, SPIKE_STARTADDR, True,  fuzzerstate.num_pickable_floating_regs if fuzzerstate.design_has_fpu else 0, fuzzerstate.design_has_fpud, fuzzerstate)
+        rtl_spike_pc_seq, (finalintregvals_spikecheck, finalfpuregvals_spikecheck) = run_trace_all_pcs(fuzzerstate.instance_to_str(), rtl_spike_elfpath, spike_isa_for_rtl_elf(design_name), len(flat_instr_objs)+n_extra_cnop_steps+1, SPIKE_STARTADDR, True,  fuzzerstate.num_pickable_floating_regs if fuzzerstate.design_has_fpu else 0, fuzzerstate.design_has_fpud, fuzzerstate)
         if not NO_REMOVE_TMPFILES:
             os.remove(rtl_spike_elfpath)
             del rtl_spike_elfpath
