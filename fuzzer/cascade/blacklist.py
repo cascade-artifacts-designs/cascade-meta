@@ -22,14 +22,22 @@ def blacklist_changing_instructions(fuzzerstate):
     # The first two instructions set up the relocator reg and may change betweend spike and rtl.
     fuzzerstate.memview_blacklist.alloc_mem_range(fuzzerstate.bb_start_addr_seq[0], 8) # NO_COMPRESSED
 
-    # Find specific instruction types to blacklist
+    # Find specific instruction types to blacklist. Also blacklist any slot
+    # marked iscompressed: in the RTL ELF such a slot is emitted as a packed
+    # (compressed_instr | c.nop) pair, while in the spike-resolution ELF the
+    # same slot is emitted as the full uncompressed 32-bit form
+    # (see _emit_slot_bytecode in genelf.py). The two byte sequences differ,
+    # so loads landing on these slots return divergent values between the two
+    # runs — which in turn corrupts placeholder-consumer rdep values and can
+    # produce, e.g., misaligned load addresses at runtime.
     for bb_id, bb_instrlist in enumerate(fuzzerstate.instr_objs_seq):
         for bb_instr_id, bb_instr in enumerate(bb_instrlist):
-            for instr_type_to_blacklist in INSTRUCTION_TYPES_TO_BLACKLIST:
-                if isinstance(bb_instr, instr_type_to_blacklist):
-                    curr_addr = fuzzerstate.bb_start_addr_seq[bb_id] + bb_instr_id * 4 # NO_COMPRESSED
-                    fuzzerstate.memview_blacklist.alloc_mem_range(curr_addr, 4)
-                    break
+            should_blacklist = getattr(bb_instr, 'iscompressed', False) or any(
+                isinstance(bb_instr, t) for t in INSTRUCTION_TYPES_TO_BLACKLIST
+            )
+            if should_blacklist:
+                curr_addr = fuzzerstate.bb_start_addr_seq[bb_id] + bb_instr_id * 4 # NO_COMPRESSED
+                fuzzerstate.memview_blacklist.alloc_mem_range(curr_addr, 4)
     
     # Blacklist the last instruction of the initial block because we may steer it 
     # into other blocks (typically to the context setter before steering the control 
