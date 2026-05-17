@@ -141,38 +141,39 @@ def gen_initial_basic_block(fuzzerstate, offset_addr: int, csr_init_rounding_mod
             assert curr_addr == fuzzerstate.curr_bb_start_addr + len(fuzzerstate.instr_objs_seq[-1]) * 4 # NO_COMPRESSED
 
     # Set the pickable registers to random values. We use the last pickable register as an intermediate reg.
+    # Initial register values immediately follow jump at the end of initial block, its offset from auipc instruction is
+    # 3 + num_reginit_vals instructions.
+
+    reginit_base_reg = fuzzerstate.num_pickable_regs-1
+
     # Relocate for the loads
-    fuzzerstate.add_instruction(R12DInstruction("add", fuzzerstate.num_pickable_regs-1, 0, RELOCATOR_REGISTER_ID))
-    curr_addr += 4
-
-    if fuzzerstate.design_has_fpu:
-        expect_padding = bool((curr_addr + (4*(fuzzerstate.num_pickable_regs+fuzzerstate.num_pickable_floating_regs-1))) & 0x7 == 4) # Says whether there will be a padding required to align the random data
-        bytes_until_random_vals = 8 + 4*(fuzzerstate.num_pickable_regs+fuzzerstate.num_pickable_floating_regs-1) + int(expect_padding) * 4 # NO_COMPRESSED
-    else:
-        expect_padding = bool((curr_addr + (4*(fuzzerstate.num_pickable_regs-1))) & 0x7 == 4) # Says whether there will be a padding required to align the random data
-        bytes_until_random_vals = 8 + 4*(fuzzerstate.num_pickable_regs-1) + int(expect_padding) * 4 # NO_COMPRESSED
-
     bytes_until_random_vals_base_for_debug = curr_addr
-    fuzzerstate.add_instruction(RegImmInstruction("addi", fuzzerstate.num_pickable_regs-1, fuzzerstate.num_pickable_regs-1, bytes_until_random_vals + curr_addr, fuzzerstate.is_design_64bit))
+    fuzzerstate.add_instruction(ImmRdInstruction('auipc', reginit_base_reg, 0, fuzzerstate.is_design_64bit))
     curr_addr += 4
+
+    num_reginit_vals = fuzzerstate.num_pickable_regs-1
+    if fuzzerstate.design_has_fpu:
+        num_reginit_vals += fuzzerstate.num_pickable_floating_regs
+    expect_padding = bool((curr_addr + 4*num_reginit_vals) & 0x7 == 4) # Says whether there will be a padding required
+    bytes_until_random_vals = 4 * (3 + num_reginit_vals + int(expect_padding)) # NO_COMPRESSED
+    fuzzerstate.add_instruction(RegImmInstruction("addi", reginit_base_reg, reginit_base_reg, bytes_until_random_vals, fuzzerstate.is_design_64bit))
+    curr_addr += 4
+
     # Floating loads must be done before int loads, because the last pickable int register will be overwritten.
     if fuzzerstate.design_has_fpu:
         if DO_ASSERT:
             assert fuzzerstate.num_pickable_floating_regs <= fuzzerstate.num_pickable_regs, "For this param choice, we need to adapt slightly the initial block."
         for fp_reg_id in range(fuzzerstate.num_pickable_floating_regs):
-            fuzzerstate.add_instruction(FloatLoadInstruction("fld" if fuzzerstate.is_design_64bit else "flw", fp_reg_id, fuzzerstate.num_pickable_regs-1, 8*(fp_reg_id+fuzzerstate.num_pickable_regs-1), -1, fuzzerstate.is_design_64bit))
+            fuzzerstate.add_instruction(FloatLoadInstruction("fld" if fuzzerstate.is_design_64bit else "flw", fp_reg_id, reginit_base_reg, 8*(fp_reg_id+fuzzerstate.num_pickable_regs-1), -1, fuzzerstate.is_design_64bit))
             curr_addr += 4
     for reg_id in range(1, fuzzerstate.num_pickable_regs):
-        fuzzerstate.add_instruction(IntLoadInstruction("ld" if fuzzerstate.is_design_64bit else "lw", reg_id, fuzzerstate.num_pickable_regs-1, 8*(reg_id-1), -1, fuzzerstate.is_design_64bit))
+        fuzzerstate.add_instruction(IntLoadInstruction("ld" if fuzzerstate.is_design_64bit else "lw", reg_id, reginit_base_reg, 8*(reg_id-1), -1, fuzzerstate.is_design_64bit))
         curr_addr += 4
 
     if DO_ASSERT:
         assert curr_addr == fuzzerstate.curr_bb_start_addr + len(fuzzerstate.instr_objs_seq[-1]) * 4, f"{curr_addr}, {fuzzerstate.curr_bb_start_addr + len(fuzzerstate.instr_objs_seq[-1]) * 4}" # NO_COMPRESSED
 
     # We pre-allocate the space for the initial block before generating the next bb address.
-    num_reginit_vals = fuzzerstate.num_pickable_regs-1
-    if fuzzerstate.design_has_fpu:
-        num_reginit_vals += fuzzerstate.num_pickable_floating_regs
     for _ in range(num_reginit_vals):
         fuzzerstate.initial_reg_data_content.append(0 if random.random() < fuzzerstate.proba_reg_starts_with_zero else random.randrange(1 << 64))
 
