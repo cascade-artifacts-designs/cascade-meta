@@ -531,12 +531,14 @@ def pop_last_bbs_to_connect_with_final_block(fuzzerstate):
             # The target address of the last cf instruction will be injected later.
             if popped_at_least_once:
                 fuzzerstate.intregpickstate.restore_state(fuzzerstate.saved_reg_states[-1])
+                fuzzerstate.restore_priv_fpu_state()
             return True
         # else, in case the last block could not reach the final block, then we discard it and try with the previous one.
         popped_at_least_once = True
         fuzzerstate.instr_objs_seq.pop()
         fuzzerstate.bb_start_addr_seq.pop()
         fuzzerstate.saved_reg_states.pop()
+        fuzzerstate.saved_priv_fpu_states.pop()
     return False
 
 # @return a list of addresses for the memory operations, in their order of occurrence
