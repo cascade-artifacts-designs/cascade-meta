@@ -16,3 +16,8 @@ DO_EXPENSIVE_ASSERT = False # More expensive assertions
 NO_REMOVE_TMPFILES = False # Used for debugging purposes.
 
 RUN_TIMEOUT_SECONDS = 60*60*2 # A program is not supposed to run longer than this in RTL simulation.
+
+# Master switch for the C extension. When True, eligible instructions are
+# packed as a 16-bit compressed encoding plus c.nop into their 4-byte slot.
+# This is enabled implicitly for designs whose marchflags include 'c'.
+USE_COMPRESSED = True

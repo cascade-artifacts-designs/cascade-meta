@@ -112,6 +112,17 @@ REG_FSM_WEIGHTS = np.array([
 PROBA_CONSUME_PRODUCED1_SAME = 0.05 # The proba to output the same register as PRODUCED1 at the output of a CONSUME op
 
 ###
+# Compressed (C extension) opportunistic compression
+###
+
+# Probability of attempting to compress a regular instruction whose class is
+# eligible (ALU, loads/stores, branches, JAL, JALR). The actual compression is
+# best-effort: if the picked operands or immediate do not fit RVC encoding
+# constraints, the instruction stays uncompressed (no retries). This lets us
+# stress the RVC decoder without skewing the regular instruction-class mix.
+COMPRESSION_PROBABILITY = 0.7
+
+###
 # Exceptions
 ###
 

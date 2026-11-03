@@ -5,12 +5,69 @@
 import random
 import numpy as np
 
-from params.runparams import DO_ASSERT
+from params.runparams import DO_ASSERT, USE_COMPRESSED
 
-from params.fuzzparams import NUM_MIN_FREE_INTREGS, REG_FSM_WEIGHTS, NONTAKEN_BRANCH_INTO_RANDOM_DATA_PROBA
+from params.fuzzparams import NUM_MIN_FREE_INTREGS, REG_FSM_WEIGHTS, NONTAKEN_BRANCH_INTO_RANDOM_DATA_PROBA, COMPRESSION_PROBABILITY
 from cascade.util import IntRegIndivState
 from cascade.cfinstructionclasses import *
 from rv.util import PARAM_REGTYPE, PARAM_SIZES_BITS_32, PARAM_SIZES_BITS_64
+
+
+# Instruction strings whose RVC equivalent we attempt to emit. Used to decide
+# *before* picking operands whether to bias toward RVC-addressable registers,
+# so the dispatcher's feasibility check actually succeeds often enough.
+_COMPRESSIBLE_INSTR_STRS = frozenset({
+    "add", "sub", "and", "or", "xor", "addw", "subw",
+    "addi", "addiw", "andi", "slli", "srli", "srai", "lui",
+    "lw", "ld", "sw", "sd", "flw", "fld", "fsw", "fsd",
+    "beq", "bne", "jal", "jalr",
+})
+
+# Strength of the RVC reg bias when create_instr picks operands for a class
+# that has an RVC equivalent. Higher = more compressed instructions emitted
+# (better C-decoder coverage) at the cost of slightly less uniform reg usage.
+# Multiplies the base sampling weight of {x2, x8..x15}; 8.0 lands around
+# 30-40% compression rate in mixed workloads on rv64gc designs.
+_RVC_BIAS_STRENGTH = 8.0
+
+
+def _want_compress(instr_str: str, fuzzerstate) -> bool:
+    if not USE_COMPRESSED:
+        return False
+    if not getattr(fuzzerstate, 'design_has_compressed_support', False):
+        return False
+    if instr_str not in _COMPRESSIBLE_INSTR_STRS:
+        return False
+    return random.random() < COMPRESSION_PROBABILITY
+
+
+def _maybe_mark_compressed(instr, fuzzerstate, want_compress: bool):
+    """Mark ``instr`` as compressed iff the caller pre-decided to compress and
+    the operands actually fit the RVC encoding. Operand picking already ran
+    biased toward RVC-addressable registers when ``want_compress`` was True.
+
+    Branches and JAL are special: their immediate is not yet known when
+    cascade calls ``create_instr`` (it gets patched later). We attach the flag
+    based on register-level fit and let ``_emit_slot_bytecode`` re-check the
+    immediate at emit time, clearing the flag on miss.
+    """
+    if not want_compress:
+        return instr
+    from rv.rvc import is_compressible_class, try_pack_compressed_with_nop
+    if not is_compressible_class(instr):
+        return instr
+    from cascade.cfinstructionclasses import BranchInstruction, JALInstruction
+    if isinstance(instr, BranchInstruction):
+        if instr.rs2 == 0 and 8 <= instr.rs1 <= 15:
+            instr.iscompressed = True
+        return instr
+    if isinstance(instr, JALInstruction):
+        if instr.rd == 0:
+            instr.iscompressed = True
+        return instr
+    if try_pack_compressed_with_nop(instr) is not None:
+        instr.iscompressed = True
+    return instr
 
 # This module creates an instruction from its instruction string, and some state which will condition which registers and immediates will be picked, and with which probability.
 
@@ -273,51 +330,60 @@ def create_targeted_consumer_instrobj(fuzzerstate):
 # The reservation in the MemoryView is already done ahead and should not be reiterated here.
 # @param jalr_addr_reg: only meaningful if a jalr is present (in the latter case, it should be the next instruction)
 def create_instr(instr_str: str, fuzzerstate, curr_addr: int, iscompressed: bool = False):
-    if DO_ASSERT:
-        assert not iscompressed
+    # Decide upfront whether to attempt compression and bias operand picking
+    # accordingly. The bias is restored before returning so concurrent
+    # placeholder/exception flows are unaffected.
+    want_compress = _want_compress(instr_str, fuzzerstate)
+    saved_bias = fuzzerstate.intregpickstate.rvc_bias if hasattr(fuzzerstate, 'intregpickstate') else 0.0
+    if want_compress and hasattr(fuzzerstate, 'intregpickstate'):
+        fuzzerstate.intregpickstate.rvc_bias = _RVC_BIAS_STRENGTH
+    try:
+        # Integer instructions
+        if instr_str in R12DInstructions:
+            instr = _create_R12DInstruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in ImmRdInstructions:
+            instr = _create_ImmRdInstruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in RegImmInstructions:
+            instr = _create_RegImmInstruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in BranchInstructions:
+            instr = _create_BranchInstruction(instr_str, fuzzerstate, curr_addr, iscompressed)
+        elif instr_str in JALInstructions:
+            instr = _create_JALInstruction(instr_str, fuzzerstate, curr_addr, iscompressed)
+        elif instr_str in JALRInstructions:
+            instr = _create_JALRInstruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in SpecialInstructions:
+            instr = _create_SpecialInstruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in IntLoadInstructions:
+            instr = _create_IntLoadInstruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in IntStoreInstructions:
+            instr = _create_IntStoreInstruction(instr_str, fuzzerstate, iscompressed)
+        # Floating point instructions
+        elif instr_str in FloatLoadInstructions:
+            instr = _create_FloatLoadInstruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in FloatStoreInstructions:
+            instr = _create_FloatStoreInstruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in FloatToIntInstructions:
+            instr = _create_FloatToIntInstruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in IntToFloatInstructions:
+            instr = _create_IntToFloatInstruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in Float4Instructions:
+            instr = _create_Float4Instruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in Float3Instructions:
+            instr = _create_Float3Instruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in Float3NoRmInstructions:
+            instr = _create_Float3NoRmInstruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in Float2Instructions:
+            instr = _create_Float2Instruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in FloatIntRd2Instructions:
+            instr = _create_FloatIntRd2Instruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in FloatIntRd1Instructions:
+            instr = _create_FloatIntRd1Instruction(instr_str, fuzzerstate, iscompressed)
+        elif instr_str in FloatIntRs1Instructions:
+            instr = _create_FloatIntRs1Instruction(instr_str, fuzzerstate, iscompressed)
+        else:
+            raise ValueError(f"Unexpected instruction string: `{instr_str}`")
+    finally:
+        if hasattr(fuzzerstate, 'intregpickstate'):
+            fuzzerstate.intregpickstate.rvc_bias = saved_bias
 
-    # Integer instructions
-    if instr_str in R12DInstructions:
-        return _create_R12DInstruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in ImmRdInstructions:
-        return _create_ImmRdInstruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in RegImmInstructions:
-        return _create_RegImmInstruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in BranchInstructions:
-        return _create_BranchInstruction(instr_str, fuzzerstate, curr_addr, iscompressed)
-    elif instr_str in JALInstructions:
-        return _create_JALInstruction(instr_str, fuzzerstate, curr_addr, iscompressed)
-    elif instr_str in JALRInstructions:
-        return _create_JALRInstruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in SpecialInstructions:
-        return _create_SpecialInstruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in IntLoadInstructions:
-        return _create_IntLoadInstruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in IntStoreInstructions:
-        return _create_IntStoreInstruction(instr_str, fuzzerstate, iscompressed)
-    # Floating point instructions
-    elif instr_str in FloatLoadInstructions:
-        return _create_FloatLoadInstruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in FloatStoreInstructions:
-        return _create_FloatStoreInstruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in FloatToIntInstructions:
-        return _create_FloatToIntInstruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in IntToFloatInstructions:
-        return _create_IntToFloatInstruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in Float4Instructions:
-        return _create_Float4Instruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in Float3Instructions:
-        return _create_Float3Instruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in Float3NoRmInstructions:
-        return _create_Float3NoRmInstruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in Float2Instructions:
-        return _create_Float2Instruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in FloatIntRd2Instructions:
-        return _create_FloatIntRd2Instruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in FloatIntRd1Instructions:
-        return _create_FloatIntRd1Instruction(instr_str, fuzzerstate, iscompressed)
-    elif instr_str in FloatIntRs1Instructions:
-        return _create_FloatIntRs1Instruction(instr_str, fuzzerstate, iscompressed)
-
-    else:
-        raise ValueError(f"Unexpected instruction string: `{instr_str}`")
+    return _maybe_mark_compressed(instr, fuzzerstate, want_compress)

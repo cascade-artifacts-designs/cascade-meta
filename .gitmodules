@@ -10,9 +10,6 @@
 [submodule "tools/bender"]
 	path = tools/bender
 	url = https://github.com/pulp-platform/bender.git
-[submodule "tools/makeelf"]
-	path = tools/makeelf
-	url = https://github.com/flaviens/makeelf
 [submodule "tools/verilator"]
 	path = tools/verilator
 	url = https://github.com/verilator/verilator.git

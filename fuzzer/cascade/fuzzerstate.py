@@ -16,6 +16,7 @@ from cascade.randomize.pickreg import IntRegPickState, FloatRegPickState
 from cascade.randomize.pickisainstrclass import ISAINSTRCLASS_INITIAL_BOOSTERS
 from cascade.randomize.pickexceptionop import EXCEPTION_OP_TYPE_INITIAL_BOOSTERS
 
+from copy import deepcopy
 import random
 
 class FuzzerState:
@@ -62,11 +63,15 @@ class FuzzerState:
         self.intregpickstate = IntRegPickState(self.num_pickable_regs, self.nodependencybias)
         self.floatregpickstate = FloatRegPickState(self.num_pickable_floating_regs)
         self.privilegestate = PrivilegeState()
+        # The initial block enables the FPU. Do not keep the value of a previous generation attempt.
+        if self.design_has_fpu:
+            self.is_fpu_activated = True
 
         # self.instr_objs_seq does NEVER contain the final basic block.
         self.instr_objs_seq = [] # List (queue) of (for each basic block) lists of instruction objects
         self.bb_start_addr_seq = [] # List (queue) of bb start addresses. Self-managed through init_new_bb.
         self.saved_reg_states = [] # List (queue) of register save objects, as saved by pickreg.py
+        self.saved_priv_fpu_states = [] # List (queue) of (privilegestate, is_fpu_activated) pairs, saved together with saved_reg_states
 
         # Strictly increasing when we create new producer0, to ensure uniqueness
         self.next_producer_id = 0
@@ -118,14 +123,24 @@ class FuzzerState:
         self.instr_objs_seq.pop()
         self.bb_start_addr_seq.pop()
         self.intregpickstate.restore_state(self.saved_reg_states[-1])
+        self.restore_priv_fpu_state()
 
     # @brief returns the current address for the next instruction to generate
     def get_current_addr(self):
         return self.curr_bb_start_addr + 4*len(self.instr_objs_seq[-1])
     
-    # @brief stores the current states of registers
+    # @brief stores the current states of registers, as well as the privilege and FPU states,
+    # because they may be changed by basic blocks that are later dropped.
     def save_reg_state(self):
         self.saved_reg_states.append(self.intregpickstate.save_curr_state())
+        self.saved_priv_fpu_states.append((deepcopy(self.privilegestate), self.is_fpu_activated if self.design_has_fpu else None))
+
+    # @brief restores the privilege and FPU states saved together with the last register state
+    def restore_priv_fpu_state(self):
+        privilegestate, is_fpu_activated = self.saved_priv_fpu_states[-1]
+        self.privilegestate = deepcopy(privilegestate)
+        if self.design_has_fpu:
+            self.is_fpu_activated = is_fpu_activated
 
     # @brief initializes a new basic block
     def init_new_bb(self):

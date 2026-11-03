@@ -55,12 +55,13 @@ def finalblock(fuzzerstate, design_name: str):
         ret.append(IntStoreInstruction("sd" if is_design_64bit else "sw", RDEP_MASK_REGISTER_ID, reg_id, 0, -1, is_design_64bit))
         ret.append(SpecialInstruction("fence"))
 
-    # Store the floating values as well, if FPU is supported and if there is no risk of it being deactivated
-    if design_has_fpu and not fuzzerstate.is_fpu_activated:
+    # Store the floating values as well, if FPU is supported and is (or can be) activated.
+    # This relies on fuzzerstate.is_fpu_activated being accurate, else the FP stores would trap.
+    if design_has_fpu:
         # Check that the fpregdump addr is correctly positioned
         if DO_ASSERT:
             assert get_design_fpreg_dump_addr(design_name) == regdump_addr + 8, f"We make the assumption that the FP regdump addr is the int regdump address + 8. However, currently, they are respectively {hex(get_design_fpreg_dump_addr(design_name))} and regdump_addr={hex(regdump_addr)}"
-        if fuzzerstate.privilegestate.privstate == PrivilegeStateEnum.MACHINE:
+        if not fuzzerstate.is_fpu_activated and fuzzerstate.privilegestate.privstate == PrivilegeStateEnum.MACHINE:
             # Enable the FPU
             ret.append(CSRRegInstruction("csrrw", 0, FPU_ENDIS_REGISTER_ID, CSR_IDS.MSTATUS))
             fuzzerstate.is_fpu_activated = True
