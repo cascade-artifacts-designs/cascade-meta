@@ -21,17 +21,17 @@ def gen_priv_descent_instr(fuzzerstate):
             assert fuzzerstate.privilegestate.is_sepc_populated, "If we are in supervisor mode, then sepc should be populated if we want to descend privileges."
             assert fuzzerstate.privilegestate.curr_mstatus_spp is not None, "spp should be populated if we want to descend privileges from supervisor mode."
 
-        is_mret = fuzzerstate.privilegestate.privstate == PrivilegeStateEnum.MACHINE
+    is_mret = fuzzerstate.privilegestate.privstate == PrivilegeStateEnum.MACHINE
 
-        # Invalidate the corresponding epc and update the current privilege level.
-        # Do not update or invalidate mpp/spp bits.
-        if is_mret:
-            fuzzerstate.privilegestate.is_mepc_populated = False
-            fuzzerstate.privilegestate.privstate = fuzzerstate.privilegestate.curr_mstatus_mpp
-            fuzzerstate.privilegestate.curr_mstatus_mpp = PrivilegeStateEnum.USER
-        else:
-            fuzzerstate.privilegestate.is_sepc_populated = False
-            fuzzerstate.privilegestate.privstate = fuzzerstate.privilegestate.curr_mstatus_spp
-            fuzzerstate.privilegestate.curr_mstatus_spp = PrivilegeStateEnum.USER
+    # Invalidate the corresponding epc and update the current privilege level.
+    # Do not update or invalidate mpp/spp bits.
+    if is_mret:
+        fuzzerstate.privilegestate.is_mepc_populated = False
+        fuzzerstate.privilegestate.privstate = fuzzerstate.privilegestate.curr_mstatus_mpp
+        fuzzerstate.privilegestate.curr_mstatus_mpp = PrivilegeStateEnum.USER
+    else:
+        fuzzerstate.privilegestate.is_sepc_populated = False
+        fuzzerstate.privilegestate.privstate = fuzzerstate.privilegestate.curr_mstatus_spp
+        fuzzerstate.privilegestate.curr_mstatus_spp = PrivilegeStateEnum.USER
 
-        return PrivilegeDescentInstruction(is_mret)
+    return PrivilegeDescentInstruction(is_mret)
